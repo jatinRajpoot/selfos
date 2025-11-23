@@ -4,6 +4,7 @@ import { databases } from "@/lib/appwrite";
 import { COLLECTION_COURSES_ID, COLLECTION_CHAPTERS_ID, COLLECTION_TOPICS_ID, DATABASE_ID } from "@/lib/config";
 import { ID, Query } from "appwrite";
 import { useRouter } from "next/navigation";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 export default function CourseEditorPage({ params }) {
     const { courseId } = use(params);
@@ -17,6 +18,9 @@ export default function CourseEditorPage({ params }) {
     const [activeChapterId, setActiveChapterId] = useState(null);
     const [newTopic, setNewTopic] = useState({ title: "", type: "video", content: "", videoUrl: "" });
     const [addingTopic, setAddingTopic] = useState(false);
+
+    // Confirm Dialog State
+    const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: "", message: "", onConfirm: null });
 
     const router = useRouter();
 
@@ -107,36 +111,59 @@ export default function CourseEditorPage({ params }) {
         }
     };
 
-    const handleDeleteCourse = async () => {
-        if (!confirm("Are you sure you want to delete this course? This action cannot be undone.")) return;
-        try {
-            await databases.deleteDocument(DATABASE_ID, COLLECTION_COURSES_ID, courseId);
-            // Ideally delete all sub-documents (chapters, topics) here too, or rely on cascading deletes if configured (Appwrite doesn't support cascade by default, so manual cleanup is better but for MVP we skip)
-            router.push("/dashboard/courses");
-        } catch (error) {
-            console.error("Error deleting course:", error);
-            alert("Failed to delete course");
-        }
+    const handleDeleteCourse = () => {
+        setConfirmDialog({
+            isOpen: true,
+            title: "Delete Course",
+            message: "Are you sure you want to delete this course? This action cannot be undone.",
+            onConfirm: async () => {
+                try {
+                    await databases.deleteDocument(DATABASE_ID, COLLECTION_COURSES_ID, courseId);
+                    router.push("/dashboard/courses");
+                } catch (error) {
+                    console.error("Error deleting course:", error);
+                    alert("Failed to delete course");
+                } finally {
+                    setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null });
+                }
+            }
+        });
     };
 
-    const handleDeleteChapter = async (chapterId) => {
-        if (!confirm("Delete this chapter and all its topics?")) return;
-        try {
-            await databases.deleteDocument(DATABASE_ID, COLLECTION_CHAPTERS_ID, chapterId);
-            fetchData();
-        } catch (error) {
-            console.error("Error deleting chapter:", error);
-        }
+    const handleDeleteChapter = (chapterId) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: "Delete Chapter",
+            message: "Delete this chapter and all its topics? This action cannot be undone.",
+            onConfirm: async () => {
+                try {
+                    await databases.deleteDocument(DATABASE_ID, COLLECTION_CHAPTERS_ID, chapterId);
+                    fetchData();
+                } catch (error) {
+                    console.error("Error deleting chapter:", error);
+                } finally {
+                    setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null });
+                }
+            }
+        });
     };
 
-    const handleDeleteTopic = async (topicId) => {
-        if (!confirm("Delete this topic?")) return;
-        try {
-            await databases.deleteDocument(DATABASE_ID, COLLECTION_TOPICS_ID, topicId);
-            fetchData();
-        } catch (error) {
-            console.error("Error deleting topic:", error);
-        }
+    const handleDeleteTopic = (topicId) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: "Delete Topic",
+            message: "Are you sure you want to delete this topic?",
+            onConfirm: async () => {
+                try {
+                    await databases.deleteDocument(DATABASE_ID, COLLECTION_TOPICS_ID, topicId);
+                    fetchData();
+                } catch (error) {
+                    console.error("Error deleting topic:", error);
+                } finally {
+                    setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null });
+                }
+            }
+        });
     };
 
     if (loading) return <div>Loading...</div>;
@@ -292,6 +319,15 @@ export default function CourseEditorPage({ params }) {
                     </form>
                 </div>
             </div>
+
+            {/* Confirm Dialog */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={() => setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null })}
+            />
         </div>
     );
 }

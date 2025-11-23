@@ -1,12 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
 import { databases, account } from "@/lib/appwrite";
-import { COLLECTION_NOTES_ID, DATABASE_ID } from "@/lib/config";
+import { COLLECTION_NOTES_ID, COLLECTION_COURSES_ID, DATABASE_ID } from "@/lib/config";
 import { ID } from "appwrite";
+import Link from "next/link";
 
 export default function DashboardPage() {
     const [note, setNote] = useState("");
     const [savingNote, setSavingNote] = useState(false);
+    const [courses, setCourses] = useState([]);
     const [stats, setStats] = useState({
         streak: 0,
         lessonsCompleted: 0,
@@ -26,7 +28,18 @@ export default function DashboardPage() {
                 console.error("Error fetching stats:", error);
             }
         };
+
+        const fetchCourses = async () => {
+            try {
+                const response = await databases.listDocuments(DATABASE_ID, COLLECTION_COURSES_ID);
+                setCourses(response.documents.slice(0, 2)); // Show only first 2 courses
+            } catch (error) {
+                console.error("Error fetching courses:", error);
+            }
+        };
+
         fetchStats();
+        fetchCourses();
     }, []);
 
     const handleSaveNote = async () => {
@@ -111,11 +124,51 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 {/* Active Courses */}
                 <div className="col-span-2 rounded-2xl bg-white p-6 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Active Courses</h3>
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <p className="text-gray-500">No active courses yet.</p>
-                        <button className="mt-4 text-indigo-600 font-medium hover:underline">Browse Courses</button>
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-bold text-gray-900">Active Courses</h3>
+                        <Link href="/dashboard/courses" className="text-sm text-indigo-600 hover:underline">
+                            View All
+                        </Link>
                     </div>
+                    {courses.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <p className="text-gray-500">No courses yet.</p>
+                            <Link href="/dashboard/courses" className="mt-4 text-indigo-600 font-medium hover:underline">
+                                Browse Courses
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {courses.map((course) => (
+                                <Link
+                                    key={course.$id}
+                                    href={`/dashboard/courses/${course.$id}`}
+                                    className="flex items-center gap-4 p-4 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group"
+                                >
+                                    <div className="h-16 w-16 rounded-lg bg-indigo-100 flex-shrink-0 overflow-hidden">
+                                        {course.coverImage ? (
+                                            <img src={course.coverImage} alt={course.title} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <div className="h-full w-full flex items-center justify-center bg-indigo-100 text-indigo-600 text-xl font-bold">
+                                                {course.title.charAt(0)}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors truncate">
+                                            {course.title}
+                                        </h4>
+                                        <p className="text-sm text-gray-500 truncate">
+                                            {course.description || "No description"}
+                                        </p>
+                                    </div>
+                                    <svg className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Daily Goal */}
