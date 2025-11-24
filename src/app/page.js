@@ -12,8 +12,8 @@ export default function LandingPage() {
       <nav className="fixed top-0 z-50 w-full border-b border-gray-100 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
-              <BookOpen size={20} />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
+              <img src="/logo.svg" alt="SelfOS Logo" className="h-full w-full object-cover" />
             </div>
             <span className="text-xl font-bold tracking-tight text-gray-900">SelfOS</span>
           </div>

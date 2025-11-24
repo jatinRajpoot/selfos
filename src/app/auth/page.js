@@ -19,6 +19,13 @@ export default function AuthPage() {
         setError("");
 
         try {
+            // Clear any existing session first
+            try {
+                await account.deleteSession("current");
+            } catch (e) {
+                // Ignore error if no session exists
+            }
+
             if (isLogin) {
                 await account.createEmailPasswordSession(email, password);
                 router.push("/dashboard");
