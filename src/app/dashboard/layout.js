@@ -3,10 +3,12 @@ import { useEffect, useState } from "react";
 import { account } from "@/lib/appwrite";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { Menu, X } from "lucide-react";
 
 export default function DashboardLayout({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
 
@@ -24,6 +26,11 @@ export default function DashboardLayout({ children }) {
 
         checkSession();
     }, [router]);
+
+    // Close mobile menu when route changes
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [pathname]);
 
     const handleLogout = async () => {
         try {
@@ -52,11 +59,28 @@ export default function DashboardLayout({ children }) {
     ];
 
     return (
-        <div className="flex h-screen bg-gray-50">
+        <div className="flex h-screen bg-gray-50 overflow-hidden">
+            {/* Mobile Menu Backdrop */}
+            {isMobileMenuOpen && (
+                <div
+                    className="fixed inset-0 z-20 bg-black/50 md:hidden"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className="w-64 border-r border-gray-200 bg-white">
-                <div className="flex h-16 items-center px-6 border-b border-gray-100">
+            <aside className={`
+                fixed inset-y-0 left-0 z-30 w-64 transform bg-white border-r border-gray-200 transition-transform duration-300 ease-in-out md:relative md:translate-x-0
+                ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
+            `}>
+                <div className="flex h-16 items-center justify-between px-6 border-b border-gray-100">
                     <span className="text-xl font-bold text-gray-900">SelfOS</span>
+                    <button
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="md:hidden text-gray-500 hover:text-gray-700"
+                    >
+                        <X size={24} />
+                    </button>
                 </div>
                 <nav className="p-4 space-y-1">
                     {navItems.map((item) => {
@@ -108,19 +132,29 @@ export default function DashboardLayout({ children }) {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto">
-                <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-8">
-                    <h2 className="text-xl font-semibold text-gray-800">
-                        {navItems.find((i) => i.href === pathname)?.name || "Dashboard"}
-                    </h2>
+            <main className="flex-1 flex flex-col h-screen overflow-hidden">
+                <header className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 md:px-8 flex-shrink-0">
                     <div className="flex items-center gap-4">
-                        <span className="text-sm text-gray-500">Welcome back, {user.name}</span>
+                        <button
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            className="md:hidden text-gray-500 hover:text-gray-700"
+                        >
+                            <Menu size={24} />
+                        </button>
+                        <h2 className="text-xl font-semibold text-gray-800">
+                            {navItems.find((i) => i.href === pathname)?.name || "Dashboard"}
+                        </h2>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <span className="hidden md:inline text-sm text-gray-500">Welcome back, {user.name}</span>
                         <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold">
                             {user.name.charAt(0)}
                         </div>
                     </div>
                 </header>
-                <div className="p-8">{children}</div>
+                <div className="flex-1 overflow-y-auto p-4 md:p-8">
+                    {children}
+                </div>
             </main>
         </div>
     );

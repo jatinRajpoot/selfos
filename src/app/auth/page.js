@@ -37,9 +37,9 @@ export default function AuthPage() {
     return (
         <div className="flex h-screen w-full bg-white">
             {/* Left Side - Form */}
-            <div className="flex w-full flex-col justify-center px-12 md:w-1/2 lg:px-24">
+            <div className="flex w-full flex-col justify-center px-6 md:w-1/2 lg:px-24">
                 <div className="mb-10">
-                    <h1 className="text-4xl font-bold text-gray-900">Welcome to SelfOS</h1>
+                    <h1 className="text-3xl md:text-4xl font-bold text-gray-900">Welcome to SelfOS</h1>
                     <p className="mt-2 text-gray-500">Unlock your potential and master new skills.</p>
                 </div>
 

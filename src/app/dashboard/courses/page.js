@@ -27,11 +27,11 @@ export default function CoursesPage() {
 
     return (
         <div>
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
                 <h1 className="text-2xl font-bold text-gray-900">All Courses</h1>
                 <Link
                     href="/dashboard/courses/create"
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 w-full sm:w-auto text-center"
                 >
                     Create New Course
                 </Link>

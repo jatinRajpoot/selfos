@@ -171,19 +171,22 @@ export default function CourseEditorPage({ params }) {
 
     return (
         <div className="max-w-4xl mx-auto pb-20">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">{course.title}</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{course.title}</h1>
                     <p className="text-gray-500 mt-1">Curriculum Editor</p>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex gap-4 w-full md:w-auto">
                     <button
                         onClick={handleDeleteCourse}
-                        className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                        className="flex-1 md:flex-none px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors text-center"
                     >
                         Delete Course
                     </button>
-                    <button onClick={() => router.push(`/dashboard/courses/${courseId}`)} className="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                    <button
+                        onClick={() => router.push(`/dashboard/courses/${courseId}`)}
+                        className="flex-1 md:flex-none px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors text-center"
+                    >
                         View Course
                     </button>
                 </div>
@@ -192,10 +195,10 @@ export default function CourseEditorPage({ params }) {
             <div className="space-y-8">
                 {chapters.map((chapter) => (
                     <div key={chapter.$id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                        <div className="bg-gray-50 px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                             <h3 className="font-semibold text-gray-900">{chapter.title}</h3>
                             <div className="flex items-center gap-4">
-                                <span className="text-xs text-gray-500">{chapter.topics.length} topics</span>
+                                <span className="text-xs text-gray-500 hidden sm:inline">{chapter.topics.length} topics</span>
                                 <button
                                     onClick={() => handleDeleteChapter(chapter.$id)}
                                     className="text-gray-400 hover:text-red-500 transition-colors"
@@ -206,18 +209,18 @@ export default function CourseEditorPage({ params }) {
                             </div>
                         </div>
 
-                        <div className="p-6 space-y-4">
+                        <div className="p-4 md:p-6 space-y-4">
                             {chapter.topics.map((topic) => (
                                 <div key={topic.$id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-white hover:border-indigo-100 transition-colors group">
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-8 w-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                                    <div className="flex items-center gap-4 overflow-hidden">
+                                        <div className="h-8 w-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
                                             {topic.type === 'video' ? 'V' : topic.type === 'text' ? 'T' : 'L'}
                                         </div>
-                                        <span className="font-medium text-gray-700">{topic.title}</span>
+                                        <span className="font-medium text-gray-700 truncate">{topic.title}</span>
                                     </div>
                                     <button
                                         onClick={() => handleDeleteTopic(topic.$id)}
-                                        className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                        className="text-gray-300 hover:text-red-500 md:opacity-0 group-hover:opacity-100 transition-all ml-2"
                                         title="Delete Topic"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -300,7 +303,7 @@ export default function CourseEditorPage({ params }) {
 
                 {/* Add Chapter Form */}
                 <div className="bg-gray-50 rounded-xl p-6 border-2 border-dashed border-gray-200">
-                    <form onSubmit={handleAddChapter} className="flex gap-4">
+                    <form onSubmit={handleAddChapter} className="flex flex-col md:flex-row gap-4">
                         <input
                             type="text"
                             placeholder="New Chapter Title"
@@ -312,7 +315,7 @@ export default function CourseEditorPage({ params }) {
                         <button
                             type="submit"
                             disabled={addingChapter}
-                            className="rounded-lg bg-gray-900 px-6 py-2 font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                            className="rounded-lg bg-gray-900 px-6 py-2 font-medium text-white hover:bg-gray-800 disabled:opacity-50 w-full md:w-auto"
                         >
                             Add Chapter
                         </button>

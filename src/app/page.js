@@ -1,8 +1,11 @@
 "use client";
 import Link from "next/link";
-import { ArrowRight, BookOpen, BarChart2, FileText, CheckCircle } from "lucide-react";
+import { ArrowRight, BookOpen, BarChart2, FileText, CheckCircle, Menu, X } from "lucide-react";
+import { useState } from "react";
 
 export default function LandingPage() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
       {/* Navbar */}
@@ -14,7 +17,9 @@ export default function LandingPage() {
             </div>
             <span className="text-xl font-bold tracking-tight text-gray-900">SelfOS</span>
           </div>
-          <div className="flex items-center gap-4">
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-4">
             <Link
               href="/auth"
               className="text-sm font-medium text-gray-600 hover:text-gray-900"
@@ -28,24 +33,54 @@ export default function LandingPage() {
               Get Started
             </Link>
           </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="text-gray-600 hover:text-gray-900"
+            >
+              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Nav Menu */}
+        {isMenuOpen && (
+          <div className="md:hidden border-t border-gray-100 bg-white px-6 py-4 space-y-4 shadow-lg">
+            <Link
+              href="/auth"
+              className="block text-base font-medium text-gray-600 hover:text-gray-900"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Log In
+            </Link>
+            <Link
+              href="/auth"
+              className="block w-full rounded-lg bg-indigo-600 px-4 py-2 text-center text-base font-medium text-white hover:bg-indigo-700"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Get Started
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+      <section className="relative pt-24 pb-16 lg:pt-48 lg:pb-32 overflow-hidden">
         <div className="mx-auto max-w-7xl px-6 text-center lg:px-8">
           <div className="mx-auto max-w-3xl">
-            <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-6xl mb-6">
+            <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl mb-6">
               Master Your Future with <span className="text-indigo-600">SelfOS</span>
             </h1>
-            <p className="mt-6 text-lg leading-8 text-gray-600">
+            <p className="mt-4 text-base sm:text-lg leading-8 text-gray-600 px-4">
               The all-in-one platform to create, manage, and track your self-learning journey.
               Organize courses, take notes, and visualize your progress.
             </p>
-            <div className="mt-10 flex items-center justify-center gap-x-6">
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-x-6">
               <Link
                 href="/auth"
-                className="group flex items-center gap-2 rounded-full bg-indigo-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="group flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-indigo-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
               >
                 Start Learning Now
                 <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
@@ -58,20 +93,20 @@ export default function LandingPage() {
         </div>
 
         {/* Abstract Background Elements */}
-        <div className="absolute top-0 left-1/2 -z-10 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-indigo-50 blur-3xl opacity-50"></div>
+        <div className="absolute top-0 left-1/2 -z-10 h-[400px] w-[400px] sm:h-[600px] sm:w-[600px] -translate-x-1/2 rounded-full bg-indigo-50 blur-3xl opacity-50"></div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-24 bg-gray-50">
+      <section id="features" className="py-16 sm:py-24 bg-gray-50">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-base font-semibold leading-7 text-indigo-600">Everything you need</h2>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+            <p className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
               Built for the modern self-learner
             </p>
           </div>
-          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
+          <div className="mx-auto mt-12 sm:mt-20 lg:mt-24 lg:max-w-none">
+            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-10 sm:gap-y-16 lg:max-w-none lg:grid-cols-3">
               <div className="flex flex-col items-start">
                 <div className="rounded-lg bg-white p-2 ring-1 ring-gray-900/10">
                   <BookOpen className="h-6 w-6 text-indigo-600" aria-hidden="true" />
@@ -107,7 +142,7 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section className="relative isolate overflow-hidden bg-gray-900 py-16 sm:py-24 lg:py-32">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-2">
+          <div className="mx-auto grid max-w-2xl grid-cols-1 gap-x-8 gap-y-12 lg:max-w-none lg:grid-cols-2">
             <div className="max-w-xl lg:max-w-lg">
               <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 Ready to start your journey?
@@ -124,7 +159,7 @@ export default function LandingPage() {
                 </Link>
               </div>
             </div>
-            <dl className="grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-2 lg:pt-2">
+            <dl className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 lg:pt-2">
               <div className="flex flex-col items-start">
                 <div className="rounded-md bg-white/5 p-2 ring-1 ring-white/10">
                   <CheckCircle className="h-6 w-6 text-white" aria-hidden="true" />
