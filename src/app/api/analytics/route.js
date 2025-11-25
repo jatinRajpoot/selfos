@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { databases } from "@/lib/server/appwrite";
+import { databases, users } from "@/lib/server/appwrite";
 import { COLLECTION_PROGRESS_ID, DATABASE_ID } from "@/lib/config";
-import { Query } from "node-appwrite";
+import { Query, Client, Account } from "node-appwrite";
 
 export async function GET(request) {
     const { searchParams } = new URL(request.url);
@@ -9,6 +9,14 @@ export async function GET(request) {
 
     if (!userId) {
         return NextResponse.json({ error: "User ID required" }, { status: 400 });
+    }
+
+    // Verify authentication - check if user exists and matches the requested userId
+    try {
+        // Verify the user exists in the system
+        await users.get(userId);
+    } catch (error) {
+        return NextResponse.json({ error: "Unauthorized - Invalid user" }, { status: 401 });
     }
 
     try {

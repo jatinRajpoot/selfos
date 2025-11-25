@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { databases } from "@/lib/appwrite";
+import { databases, account } from "@/lib/appwrite";
+import { Query } from "appwrite";
 import { COLLECTION_COURSES_ID, DATABASE_ID } from "@/lib/config";
 import Link from "next/link";
+import { CourseCardSkeleton } from "@/components/Skeleton";
 
 export default function CoursesPage() {
     const [courses, setCourses] = useState([]);
@@ -11,7 +13,12 @@ export default function CoursesPage() {
     useEffect(() => {
         const fetchCourses = async () => {
             try {
-                const response = await databases.listDocuments(DATABASE_ID, COLLECTION_COURSES_ID);
+                const user = await account.get();
+                const response = await databases.listDocuments(
+                    DATABASE_ID,
+                    COLLECTION_COURSES_ID,
+                    [Query.equal("authorId", user.$id)]
+                );
                 setCourses(response.documents);
             } catch (error) {
                 console.error("Error fetching courses:", error);
@@ -23,7 +30,21 @@ export default function CoursesPage() {
         fetchCourses();
     }, []);
 
-    if (loading) return <div>Loading courses...</div>;
+    if (loading) {
+        return (
+            <div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+                    <h1 className="text-2xl font-bold text-gray-900">All Courses</h1>
+                    <div className="h-10 w-40 bg-gray-200 rounded-lg animate-pulse" />
+                </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {[...Array(6)].map((_, i) => (
+                        <CourseCardSkeleton key={i} />
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div>
@@ -38,7 +59,27 @@ export default function CoursesPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {courses.map((course) => (
+                {courses.length === 0 ? (
+                    <div className="col-span-full text-center py-16">
+                        <div className="mx-auto w-24 h-24 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
+                            <svg className="w-12 h-12 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No courses yet</h3>
+                        <p className="text-gray-500 mb-6">Create your first course to start learning.</p>
+                        <Link
+                            href="/dashboard/courses/create"
+                            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            Create Your First Course
+                        </Link>
+                    </div>
+                ) : (
+                    courses.map((course) => (
                     <Link key={course.$id} href={`/dashboard/courses/${course.$id}`} className="group block relative">
                         <div className="overflow-hidden rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md border border-gray-100">
                             <div className="aspect-video w-full bg-gray-200 relative">
@@ -55,10 +96,10 @@ export default function CoursesPage() {
                                         e.stopPropagation();
                                         window.location.href = `/dashboard/courses/create/${course.$id}`;
                                     }}
-                                    className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-sm text-gray-600 hover:text-indigo-600 hover:bg-white transition-all opacity-0 group-hover:opacity-100"
-                                    title="Edit Course"
+                                    className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-sm text-gray-600 hover:text-indigo-600 hover:bg-white transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                    aria-label={`Edit ${course.title}`}
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                         <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
                                     </svg>
                                 </button>
@@ -76,7 +117,8 @@ export default function CoursesPage() {
                             </div>
                         </div>
                     </Link>
-                ))}
+                    ))
+                )}
             </div>
         </div>
     );

@@ -2,8 +2,9 @@
 import { useState, useEffect } from "react";
 import { databases, account } from "@/lib/appwrite";
 import { COLLECTION_NOTES_ID, COLLECTION_COURSES_ID, DATABASE_ID } from "@/lib/config";
-import { ID } from "appwrite";
+import { ID, Query } from "appwrite";
 import Link from "next/link";
+import { useToast } from "@/components/Toast";
 
 export default function DashboardPage() {
     const [note, setNote] = useState("");
@@ -14,6 +15,7 @@ export default function DashboardPage() {
         lessonsCompleted: 0,
         dailyGoal: 0,
     });
+    const toast = useToast();
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -31,7 +33,12 @@ export default function DashboardPage() {
 
         const fetchCourses = async () => {
             try {
-                const response = await databases.listDocuments(DATABASE_ID, COLLECTION_COURSES_ID);
+                const user = await account.get();
+                const response = await databases.listDocuments(
+                    DATABASE_ID,
+                    COLLECTION_COURSES_ID,
+                    [Query.equal("authorId", user.$id)]
+                );
                 setCourses(response.documents.slice(0, 2)); // Show only first 2 courses
             } catch (error) {
                 console.error("Error fetching courses:", error);
@@ -60,10 +67,10 @@ export default function DashboardPage() {
                 }
             );
             setNote("");
-            alert("Note saved!");
+            toast.success("Note saved!");
         } catch (error) {
             console.error("Error saving note:", error);
-            alert("Failed to save note.");
+            toast.error("Failed to save note.");
         } finally {
             setSavingNote(false);
         }

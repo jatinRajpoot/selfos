@@ -1,4 +1,5 @@
 import "./app.css";
+import { ToastProvider } from "@/components/Toast";
 
 export const metadata = {
   title: "SelfOS",
@@ -19,7 +20,9 @@ export default function RootLayout({ children }) {
         <link rel="icon" type="image/svg+xml" href="/logo.svg" />
       </head>
       <body className={"bg-[#FAFAFB] font-[Inter] text-sm text-[#56565C]"}>
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

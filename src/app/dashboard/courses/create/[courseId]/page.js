@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect, use } from "react";
 import { databases } from "@/lib/appwrite";
-import { COLLECTION_COURSES_ID, COLLECTION_CHAPTERS_ID, COLLECTION_TOPICS_ID, DATABASE_ID } from "@/lib/config";
+import { COLLECTION_COURSES_ID, COLLECTION_CHAPTERS_ID, COLLECTION_TOPICS_ID, COLLECTION_PROGRESS_ID, COLLECTION_NOTES_ID, DATABASE_ID } from "@/lib/config";
 import { ID, Query } from "appwrite";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 
 export default function CourseEditorPage({ params }) {
     const { courseId } = use(params);
@@ -23,6 +24,7 @@ export default function CourseEditorPage({ params }) {
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: "", message: "", onConfirm: null });
 
     const router = useRouter();
+    const toast = useToast();
 
     useEffect(() => {
         fetchData();
@@ -115,14 +117,61 @@ export default function CourseEditorPage({ params }) {
         setConfirmDialog({
             isOpen: true,
             title: "Delete Course",
-            message: "Are you sure you want to delete this course? This action cannot be undone.",
+            message: "Are you sure you want to delete this course? This will also delete all chapters, topics, progress, and notes. This action cannot be undone.",
             onConfirm: async () => {
                 try {
+                    // Cascade delete: Delete all related data first
+                    // 1. Get all chapters for this course
+                    const chaptersData = await databases.listDocuments(
+                        DATABASE_ID,
+                        COLLECTION_CHAPTERS_ID,
+                        [Query.equal("courseId", courseId)]
+                    );
+
+                    // 2. For each chapter, delete all topics
+                    for (const chapter of chaptersData.documents) {
+                        const topicsData = await databases.listDocuments(
+                            DATABASE_ID,
+                            COLLECTION_TOPICS_ID,
+                            [Query.equal("chapterId", chapter.$id)]
+                        );
+
+                        // Delete progress for each topic
+                        for (const topic of topicsData.documents) {
+                            const progressData = await databases.listDocuments(
+                                DATABASE_ID,
+                                COLLECTION_PROGRESS_ID,
+                                [Query.equal("topicId", topic.$id)]
+                            );
+                            for (const progress of progressData.documents) {
+                                await databases.deleteDocument(DATABASE_ID, COLLECTION_PROGRESS_ID, progress.$id);
+                            }
+                            // Delete the topic
+                            await databases.deleteDocument(DATABASE_ID, COLLECTION_TOPICS_ID, topic.$id);
+                        }
+
+                        // Delete the chapter
+                        await databases.deleteDocument(DATABASE_ID, COLLECTION_CHAPTERS_ID, chapter.$id);
+                    }
+
+                    // 3. Delete all notes for this course
+                    const notesData = await databases.listDocuments(
+                        DATABASE_ID,
+                        COLLECTION_NOTES_ID,
+                        [Query.equal("courseId", courseId)]
+                    );
+                    for (const note of notesData.documents) {
+                        await databases.deleteDocument(DATABASE_ID, COLLECTION_NOTES_ID, note.$id);
+                    }
+
+                    // 4. Finally delete the course
                     await databases.deleteDocument(DATABASE_ID, COLLECTION_COURSES_ID, courseId);
+                    
+                    toast.success("Course deleted successfully");
                     router.push("/dashboard/courses");
                 } catch (error) {
                     console.error("Error deleting course:", error);
-                    alert("Failed to delete course");
+                    toast.error("Failed to delete course");
                 } finally {
                     setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null });
                 }
@@ -137,10 +186,31 @@ export default function CourseEditorPage({ params }) {
             message: "Delete this chapter and all its topics? This action cannot be undone.",
             onConfirm: async () => {
                 try {
+                    // Delete all topics in this chapter first
+                    const topicsData = await databases.listDocuments(
+                        DATABASE_ID,
+                        COLLECTION_TOPICS_ID,
+                        [Query.equal("chapterId", chapterId)]
+                    );
+                    for (const topic of topicsData.documents) {
+                        // Delete progress for this topic
+                        const progressData = await databases.listDocuments(
+                            DATABASE_ID,
+                            COLLECTION_PROGRESS_ID,
+                            [Query.equal("topicId", topic.$id)]
+                        );
+                        for (const progress of progressData.documents) {
+                            await databases.deleteDocument(DATABASE_ID, COLLECTION_PROGRESS_ID, progress.$id);
+                        }
+                        await databases.deleteDocument(DATABASE_ID, COLLECTION_TOPICS_ID, topic.$id);
+                    }
+                    
                     await databases.deleteDocument(DATABASE_ID, COLLECTION_CHAPTERS_ID, chapterId);
+                    toast.success("Chapter deleted successfully");
                     fetchData();
                 } catch (error) {
                     console.error("Error deleting chapter:", error);
+                    toast.error("Failed to delete chapter");
                 } finally {
                     setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null });
                 }
@@ -155,10 +225,22 @@ export default function CourseEditorPage({ params }) {
             message: "Are you sure you want to delete this topic?",
             onConfirm: async () => {
                 try {
+                    // Delete progress for this topic first
+                    const progressData = await databases.listDocuments(
+                        DATABASE_ID,
+                        COLLECTION_PROGRESS_ID,
+                        [Query.equal("topicId", topicId)]
+                    );
+                    for (const progress of progressData.documents) {
+                        await databases.deleteDocument(DATABASE_ID, COLLECTION_PROGRESS_ID, progress.$id);
+                    }
+                    
                     await databases.deleteDocument(DATABASE_ID, COLLECTION_TOPICS_ID, topicId);
+                    toast.success("Topic deleted successfully");
                     fetchData();
                 } catch (error) {
                     console.error("Error deleting topic:", error);
+                    toast.error("Failed to delete topic");
                 } finally {
                     setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null });
                 }

@@ -3,6 +3,7 @@ import { useState, useEffect, use } from "react";
 import { databases, account } from "@/lib/appwrite";
 import { COLLECTION_COURSES_ID, COLLECTION_CHAPTERS_ID, COLLECTION_TOPICS_ID, COLLECTION_PROGRESS_ID, COLLECTION_NOTES_ID, DATABASE_ID } from "@/lib/config";
 import { ID, Query } from "appwrite";
+import { useToast } from "@/components/Toast";
 
 export default function CoursePlayerPage({ params }) {
     const { courseId } = use(params);
@@ -15,6 +16,7 @@ export default function CoursePlayerPage({ params }) {
     const [savingNote, setSavingNote] = useState(false);
     const [markingComplete, setMarkingComplete] = useState(false);
     const [completedTopics, setCompletedTopics] = useState(new Set());
+    const toast = useToast();
 
     useEffect(() => {
         fetchData();
@@ -71,9 +73,32 @@ export default function CoursePlayerPage({ params }) {
 
     const handleMarkComplete = async () => {
         if (!activeTopic || markingComplete) return;
+        
+        // Check if already completed locally
+        if (completedTopics.has(activeTopic.$id)) return;
+        
         setMarkingComplete(true);
         try {
             const user = await account.get();
+            
+            // Check if progress already exists in database to prevent duplicates
+            const existingProgress = await databases.listDocuments(
+                DATABASE_ID,
+                COLLECTION_PROGRESS_ID,
+                [
+                    Query.equal("userId", user.$id),
+                    Query.equal("topicId", activeTopic.$id),
+                    Query.equal("status", "completed")
+                ]
+            );
+            
+            if (existingProgress.documents.length > 0) {
+                // Already completed, just update local state
+                setCompletedTopics(prev => new Set(prev).add(activeTopic.$id));
+                toast.info("Topic already marked as complete");
+                return;
+            }
+            
             await databases.createDocument(
                 DATABASE_ID,
                 COLLECTION_PROGRESS_ID,
@@ -86,8 +111,10 @@ export default function CoursePlayerPage({ params }) {
                 }
             );
             setCompletedTopics(prev => new Set(prev).add(activeTopic.$id));
+            toast.success("Topic marked as complete!");
         } catch (error) {
             console.error("Error marking complete:", error);
+            toast.error("Failed to mark topic as complete");
         } finally {
             setMarkingComplete(false);
         }
@@ -110,10 +137,11 @@ export default function CoursePlayerPage({ params }) {
                     content: noteContent,
                 }
             );
-            alert("Note saved!");
+            toast.success("Note saved!");
             setNoteContent("");
         } catch (error) {
             console.error("Error saving note:", error);
+            toast.error("Failed to save note");
         } finally {
             setSavingNote(false);
         }

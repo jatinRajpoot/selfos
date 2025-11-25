@@ -78,11 +78,12 @@ export default function DashboardLayout({ children }) {
                     <button
                         onClick={() => setIsMobileMenuOpen(false)}
                         className="md:hidden text-gray-500 hover:text-gray-700"
+                        aria-label="Close navigation menu"
                     >
                         <X size={24} />
                     </button>
                 </div>
-                <nav className="p-4 space-y-1">
+                <nav className="p-4 space-y-1" role="navigation" aria-label="Main navigation">
                     {navItems.map((item) => {
                         const isActive = pathname === item.href;
                         return (
@@ -138,6 +139,8 @@ export default function DashboardLayout({ children }) {
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
                             className="md:hidden text-gray-500 hover:text-gray-700"
+                            aria-label="Open navigation menu"
+                            aria-expanded={isMobileMenuOpen}
                         >
                             <Menu size={24} />
                         </button>
@@ -146,9 +149,9 @@ export default function DashboardLayout({ children }) {
                         </h2>
                     </div>
                     <div className="flex items-center gap-4">
-                        <span className="hidden md:inline text-sm text-gray-500">Welcome back, {user.name}</span>
+                        <span className="hidden md:inline text-sm text-gray-500">Welcome back, {user.name || user.email || 'User'}</span>
                         <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold">
-                            {user.name.charAt(0)}
+                            {(user.name || user.email || 'U').charAt(0).toUpperCase()}
                         </div>
                     </div>
                 </header>
