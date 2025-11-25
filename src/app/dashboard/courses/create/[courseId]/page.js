@@ -1,11 +1,12 @@
 "use client";
 import { useState, useEffect, use } from "react";
 import { databases } from "@/lib/appwrite";
-import { COLLECTION_COURSES_ID, COLLECTION_CHAPTERS_ID, COLLECTION_TOPICS_ID, COLLECTION_PROGRESS_ID, COLLECTION_NOTES_ID, DATABASE_ID } from "@/lib/config";
+import { COLLECTION_COURSES_ID, COLLECTION_CHAPTERS_ID, COLLECTION_TOPICS_ID, COLLECTION_PROGRESS_ID, COLLECTION_NOTES_ID, COLLECTION_RESOURCES_ID, DATABASE_ID, RESOURCE_TYPES } from "@/lib/config";
 import { ID, Query } from "appwrite";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
+import { FileText, Link as LinkIcon, Youtube, MessageSquare, Sparkles, File, Plus, X, ExternalLink } from "lucide-react";
 
 export default function CourseEditorPage({ params }) {
     const { courseId } = use(params);
@@ -20,11 +21,35 @@ export default function CourseEditorPage({ params }) {
     const [newTopic, setNewTopic] = useState({ title: "", type: "video", content: "", videoUrl: "" });
     const [addingTopic, setAddingTopic] = useState(false);
 
+    // Resource State
+    const [activeTopicForResources, setActiveTopicForResources] = useState(null);
+    const [topicResources, setTopicResources] = useState({});
+    const [newResource, setNewResource] = useState({ name: "", type: "webpage", url: "" });
+    const [addingResource, setAddingResource] = useState(false);
+
     // Confirm Dialog State
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: "", message: "", onConfirm: null });
 
     const router = useRouter();
     const toast = useToast();
+
+    // Get resource icon based on type
+    const getResourceIcon = (type) => {
+        switch (type) {
+            case 'pdf':
+                return <FileText className="w-4 h-4 text-red-500" />;
+            case 'youtube':
+                return <Youtube className="w-4 h-4 text-red-600" />;
+            case 'chatgpt':
+                return <MessageSquare className="w-4 h-4 text-green-600" />;
+            case 'gemini':
+                return <Sparkles className="w-4 h-4 text-blue-500" />;
+            case 'webpage':
+                return <LinkIcon className="w-4 h-4 text-indigo-500" />;
+            default:
+                return <File className="w-4 h-4 text-gray-500" />;
+        }
+    };
 
     useEffect(() => {
         fetchData();
@@ -51,6 +76,24 @@ export default function CourseEditorPage({ params }) {
             }));
 
             setChapters(chaptersWithTopics);
+            
+            // Fetch resources for all topics
+            const resourcesMap = {};
+            for (const chapter of chaptersWithTopics) {
+                for (const topic of chapter.topics) {
+                    try {
+                        const resourcesData = await databases.listDocuments(
+                            DATABASE_ID,
+                            COLLECTION_RESOURCES_ID,
+                            [Query.equal("topicId", topic.$id)]
+                        );
+                        resourcesMap[topic.$id] = resourcesData.documents;
+                    } catch (e) {
+                        resourcesMap[topic.$id] = [];
+                    }
+                }
+            }
+            setTopicResources(resourcesMap);
         } catch (error) {
             console.error("Error fetching course data:", error);
         } finally {
@@ -90,26 +133,81 @@ export default function CourseEditorPage({ params }) {
             const chapter = chapters.find(c => c.$id === activeChapterId);
             const order = chapter ? chapter.topics.length + 1 : 1;
 
+            // Build the document data, only including videoUrl for video/youtube types with a valid URL
+            const topicData = {
+                chapterId: activeChapterId,
+                title: newTopic.title,
+                type: newTopic.type,
+                content: newTopic.content || "",
+                order: order
+            };
+
+            // Only add videoUrl if it's a video type AND has a valid URL
+            if ((newTopic.type === 'video' || newTopic.type === 'youtube') && newTopic.videoUrl.trim()) {
+                topicData.videoUrl = newTopic.videoUrl;
+            }
+
             await databases.createDocument(
                 DATABASE_ID,
                 COLLECTION_TOPICS_ID,
                 ID.unique(),
-                {
-                    chapterId: activeChapterId,
-                    title: newTopic.title,
-                    type: newTopic.type,
-                    content: newTopic.content,
-                    videoUrl: newTopic.videoUrl,
-                    order: order
-                }
+                topicData
             );
             setNewTopic({ title: "", type: "video", content: "", videoUrl: "" });
             setActiveChapterId(null);
             fetchData();
+            toast.success("Topic added!");
         } catch (error) {
             console.error("Error adding topic:", error);
+            toast.error("Failed to add topic");
         } finally {
             setAddingTopic(false);
+        }
+    };
+
+    const handleAddResource = async (e) => {
+        e.preventDefault();
+        if (!newResource.name.trim() || !newResource.url.trim() || !activeTopicForResources) return;
+        setAddingResource(true);
+        try {
+            const created = await databases.createDocument(
+                DATABASE_ID,
+                COLLECTION_RESOURCES_ID,
+                ID.unique(),
+                {
+                    topicId: activeTopicForResources,
+                    name: newResource.name,
+                    type: newResource.type,
+                    url: newResource.url,
+                    fileUrl: newResource.url, // Include fileUrl for backward compatibility
+                }
+            );
+            // Update local state
+            setTopicResources(prev => ({
+                ...prev,
+                [activeTopicForResources]: [...(prev[activeTopicForResources] || []), created]
+            }));
+            setNewResource({ name: "", type: "webpage", url: "" });
+            toast.success("Resource added!");
+        } catch (error) {
+            console.error("Error adding resource:", error);
+            toast.error("Failed to add resource");
+        } finally {
+            setAddingResource(false);
+        }
+    };
+
+    const handleDeleteResource = async (resourceId, topicId) => {
+        try {
+            await databases.deleteDocument(DATABASE_ID, COLLECTION_RESOURCES_ID, resourceId);
+            setTopicResources(prev => ({
+                ...prev,
+                [topicId]: prev[topicId].filter(r => r.$id !== resourceId)
+            }));
+            toast.success("Resource deleted!");
+        } catch (error) {
+            console.error("Error deleting resource:", error);
+            toast.error("Failed to delete resource");
         }
     };
 
@@ -293,20 +391,112 @@ export default function CourseEditorPage({ params }) {
 
                         <div className="p-4 md:p-6 space-y-4">
                             {chapter.topics.map((topic) => (
-                                <div key={topic.$id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-white hover:border-indigo-100 transition-colors group">
-                                    <div className="flex items-center gap-4 overflow-hidden">
-                                        <div className="h-8 w-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                                            {topic.type === 'video' ? 'V' : topic.type === 'text' ? 'T' : 'L'}
+                                <div key={topic.$id} className="rounded-lg border border-gray-100 bg-white overflow-hidden">
+                                    <div className="flex items-center justify-between p-3 hover:bg-gray-50 transition-colors group">
+                                        <div className="flex items-center gap-4 overflow-hidden">
+                                            <div className="h-8 w-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                                {topic.type === 'video' ? 'V' : topic.type === 'text' ? 'T' : 'L'}
+                                            </div>
+                                            <span className="font-medium text-gray-700 truncate">{topic.title}</span>
                                         </div>
-                                        <span className="font-medium text-gray-700 truncate">{topic.title}</span>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setActiveTopicForResources(activeTopicForResources === topic.$id ? null : topic.$id)}
+                                                className={`p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all ${activeTopicForResources === topic.$id ? 'text-indigo-600 bg-indigo-50' : ''}`}
+                                                title="Manage Resources"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteTopic(topic.$id)}
+                                                className="text-gray-300 hover:text-red-500 md:opacity-0 group-hover:opacity-100 transition-all ml-2"
+                                                title="Delete Topic"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <button
-                                        onClick={() => handleDeleteTopic(topic.$id)}
-                                        className="text-gray-300 hover:text-red-500 md:opacity-0 group-hover:opacity-100 transition-all ml-2"
-                                        title="Delete Topic"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                                    </button>
+                                    
+                                    {/* Resources Section */}
+                                    {activeTopicForResources === topic.$id && (
+                                        <div className="border-t border-gray-100 p-4 bg-gray-50">
+                                            <h5 className="text-xs font-bold uppercase text-gray-500 mb-3">Resources</h5>
+                                            
+                                            {/* Existing Resources */}
+                                            {(topicResources[topic.$id] || []).length > 0 && (
+                                                <div className="space-y-2 mb-4">
+                                                    {(topicResources[topic.$id] || []).map((resource) => (
+                                                        <div key={resource.$id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100">
+                                                            <div className="flex items-center gap-3">
+                                                                {getResourceIcon(resource.type)}
+                                                                <div>
+                                                                    <span className="text-sm font-medium text-gray-700">{resource.name}</span>
+                                                                    <span className="text-xs text-gray-400 ml-2 capitalize">({resource.type})</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <a
+                                                                    href={resource.url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="p-1 text-gray-400 hover:text-indigo-600"
+                                                                >
+                                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                                </a>
+                                                                <button
+                                                                    onClick={() => handleDeleteResource(resource.$id, topic.$id)}
+                                                                    className="p-1 text-gray-300 hover:text-red-500"
+                                                                >
+                                                                    <X className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            
+                                            {/* Add Resource Form */}
+                                            <form onSubmit={handleAddResource} className="space-y-3">
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Resource name"
+                                                        className="rounded border border-gray-300 px-3 py-1.5 text-sm"
+                                                        value={newResource.name}
+                                                        onChange={e => setNewResource({ ...newResource, name: e.target.value })}
+                                                        required
+                                                    />
+                                                    <select
+                                                        className="rounded border border-gray-300 px-3 py-1.5 text-sm"
+                                                        value={newResource.type}
+                                                        onChange={e => setNewResource({ ...newResource, type: e.target.value })}
+                                                    >
+                                                        <option value="webpage">Webpage</option>
+                                                        <option value="pdf">PDF</option>
+                                                        <option value="youtube">YouTube</option>
+                                                        <option value="chatgpt">ChatGPT Link</option>
+                                                        <option value="gemini">Gemini Link</option>
+                                                        <option value="file">Other File</option>
+                                                    </select>
+                                                    <input
+                                                        type="url"
+                                                        placeholder="URL"
+                                                        className="rounded border border-gray-300 px-3 py-1.5 text-sm"
+                                                        value={newResource.url}
+                                                        onChange={e => setNewResource({ ...newResource, url: e.target.value })}
+                                                        required
+                                                    />
+                                                </div>
+                                                <button
+                                                    type="submit"
+                                                    disabled={addingResource}
+                                                    className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                                                >
+                                                    {addingResource ? "Adding..." : "Add Resource"}
+                                                </button>
+                                            </form>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
 

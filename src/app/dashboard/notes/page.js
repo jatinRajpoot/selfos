@@ -463,6 +463,15 @@ export default function NotesPage() {
         notes.some(note => note.courseId === course.$id)
     );
 
+    // Get orphaned notes (notes with courseId that doesn't match any owned course, excluding quick-capture)
+    const courseIds = new Set(courses.map(c => c.$id));
+    const orphanedNotes = notes.filter(note => 
+        note.courseId !== "quick-capture" && !courseIds.has(note.courseId)
+    );
+
+    // Calculate actual displayable notes count (excluding orphaned ones)
+    const displayableNotesCount = notes.length - orphanedNotes.length;
+
     if (loading) {
         return (
             <div>
@@ -484,7 +493,7 @@ export default function NotesPage() {
                 <h1 className="text-2xl font-bold text-gray-900">My Notes</h1>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                     <FolderIcon className="w-4 h-4" />
-                    <span>{notes.length} total notes</span>
+                    <span>{displayableNotesCount} total notes</span>
                 </div>
             </div>
             

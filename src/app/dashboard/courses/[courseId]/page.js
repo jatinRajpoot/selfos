@@ -1,9 +1,11 @@
 "use client";
 import { useState, useEffect, use } from "react";
 import { databases, account } from "@/lib/appwrite";
-import { COLLECTION_COURSES_ID, COLLECTION_CHAPTERS_ID, COLLECTION_TOPICS_ID, COLLECTION_PROGRESS_ID, COLLECTION_NOTES_ID, DATABASE_ID } from "@/lib/config";
+import { COLLECTION_COURSES_ID, COLLECTION_CHAPTERS_ID, COLLECTION_TOPICS_ID, COLLECTION_PROGRESS_ID, COLLECTION_NOTES_ID, COLLECTION_RESOURCES_ID, DATABASE_ID, RESOURCE_TYPES } from "@/lib/config";
 import { ID, Query } from "appwrite";
 import { useToast } from "@/components/Toast";
+import { ChevronLeft, ChevronRight, FileText, Link as LinkIcon, Youtube, MessageSquare, Sparkles, File, ExternalLink } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 export default function CoursePlayerPage({ params }) {
     const { courseId } = use(params);
@@ -16,7 +18,56 @@ export default function CoursePlayerPage({ params }) {
     const [savingNote, setSavingNote] = useState(false);
     const [markingComplete, setMarkingComplete] = useState(false);
     const [completedTopics, setCompletedTopics] = useState(new Set());
+    const [resources, setResources] = useState([]);
     const toast = useToast();
+
+    // Helper function to get all topics in order
+    const getAllTopics = () => {
+        const allTopics = [];
+        chapters.forEach(chapter => {
+            chapter.topics.forEach(topic => {
+                allTopics.push({ ...topic, chapterTitle: chapter.title });
+            });
+        });
+        return allTopics;
+    };
+
+    // Get adjacent topic (next or previous)
+    const getAdjacentTopic = (direction) => {
+        const allTopics = getAllTopics();
+        const currentIndex = allTopics.findIndex(t => t.$id === activeTopic?.$id);
+        if (currentIndex === -1) return null;
+        
+        const newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+        if (newIndex < 0 || newIndex >= allTopics.length) return null;
+        return allTopics[newIndex];
+    };
+
+    const handleNavigate = (direction) => {
+        const topic = getAdjacentTopic(direction);
+        if (topic) {
+            setActiveTopic(topic);
+            setNoteContent("");
+        }
+    };
+
+    // Get resource icon based on type
+    const getResourceIcon = (type) => {
+        switch (type) {
+            case RESOURCE_TYPES?.PDF:
+                return <FileText className="w-5 h-5 text-red-500" />;
+            case RESOURCE_TYPES?.YOUTUBE:
+                return <Youtube className="w-5 h-5 text-red-600" />;
+            case RESOURCE_TYPES?.CHATGPT:
+                return <MessageSquare className="w-5 h-5 text-green-600" />;
+            case RESOURCE_TYPES?.GEMINI:
+                return <Sparkles className="w-5 h-5 text-blue-500" />;
+            case RESOURCE_TYPES?.WEBPAGE:
+                return <LinkIcon className="w-5 h-5 text-indigo-500" />;
+            default:
+                return <File className="w-5 h-5 text-gray-500" />;
+        }
+    };
 
     useEffect(() => {
         fetchData();
@@ -70,6 +121,25 @@ export default function CoursePlayerPage({ params }) {
         setActiveTopic(topic);
         setNoteContent(""); // Reset note for new topic (or fetch existing note if implemented)
     };
+
+    // Fetch resources when active topic changes
+    useEffect(() => {
+        const fetchResources = async () => {
+            if (!activeTopic) return;
+            try {
+                const resourcesData = await databases.listDocuments(
+                    DATABASE_ID,
+                    COLLECTION_RESOURCES_ID,
+                    [Query.equal("topicId", activeTopic.$id)]
+                );
+                setResources(resourcesData.documents);
+            } catch (error) {
+                console.error("Error fetching resources:", error);
+                setResources([]);
+            }
+        };
+        fetchResources();
+    }, [activeTopic]);
 
     const handleMarkComplete = async () => {
         if (!activeTopic || markingComplete) return;
@@ -156,9 +226,27 @@ export default function CoursePlayerPage({ params }) {
             <div className="flex-1 flex flex-col overflow-hidden order-1 lg:order-2">
                 {/* Header */}
                 <div className="h-16 border-b border-gray-200 flex items-center justify-between px-4 md:px-8 bg-white flex-shrink-0">
-                    <div className="overflow-hidden">
-                        <span className="text-sm text-gray-500 block truncate">Current Topic</span>
-                        <h2 className="text-lg font-bold text-gray-900 truncate">{activeTopic?.title}</h2>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => handleNavigate('prev')}
+                            disabled={!getAdjacentTopic('prev')}
+                            className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title="Previous Topic"
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <div className="overflow-hidden">
+                            <span className="text-sm text-gray-500 block truncate">Current Topic</span>
+                            <h2 className="text-lg font-bold text-gray-900 truncate">{activeTopic?.title}</h2>
+                        </div>
+                        <button
+                            onClick={() => handleNavigate('next')}
+                            disabled={!getAdjacentTopic('next')}
+                            className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            title="Next Topic"
+                        >
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
                     </div>
                     <button
                         onClick={handleMarkComplete}
@@ -190,11 +278,35 @@ export default function CoursePlayerPage({ params }) {
                                 )
                             ) : (
                                 <div className="w-full h-full bg-white text-gray-900 p-8 overflow-y-auto">
-                                    <div className="prose max-w-none">
-                                        {activeTopic?.content || "No content available."}
+                                    <div className="prose prose-indigo max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-indigo-600 prose-strong:text-gray-900 prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-900 prose-pre:text-gray-100">
+                                        {activeTopic?.content ? (
+                                            <ReactMarkdown>{activeTopic.content}</ReactMarkdown>
+                                        ) : (
+                                            <p className="text-gray-500">No content available.</p>
+                                        )}
                                     </div>
                                 </div>
                             )}
+                        </div>
+
+                        {/* Navigation Buttons */}
+                        <div className="flex justify-between items-center mb-8">
+                            <button
+                                onClick={() => handleNavigate('prev')}
+                                disabled={!getAdjacentTopic('prev')}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                                Previous
+                            </button>
+                            <button
+                                onClick={() => handleNavigate('next')}
+                                disabled={!getAdjacentTopic('next')}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Next
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
                         </div>
 
                         {/* Tabs */}
@@ -241,8 +353,35 @@ export default function CoursePlayerPage({ params }) {
                         )}
 
                         {activeTab === "resources" && (
-                            <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 text-center text-gray-500 text-sm">
-                                No resources attached to this topic.
+                            <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                                {resources.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {resources.map((resource) => (
+                                            <a
+                                                key={resource.$id}
+                                                href={resource.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition-all group"
+                                            >
+                                                <div className="flex-shrink-0">
+                                                    {getResourceIcon(resource.type)}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
+                                                        {resource.name}
+                                                    </h4>
+                                                    <p className="text-xs text-gray-500 capitalize">{resource.type}</p>
+                                                </div>
+                                                <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                                            </a>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center text-gray-500 text-sm py-8">
+                                        No resources attached to this topic.
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

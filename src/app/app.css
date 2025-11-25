@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+/* Ensure pointer cursor for all clickable elements */
+a,
+button,
+[role="button"],
+label[for],
+input[type="checkbox"],
+input[type="radio"],
+input[type="submit"],
+input[type="button"],
+select,
+summary {
+  cursor: pointer;
+}
+
 summary::-webkit-details-marker {
   display: none
 }

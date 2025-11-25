@@ -1,7 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { account } from "@/lib/appwrite";
+import { account, databases } from "@/lib/appwrite";
+import { DATABASE_ID, COLLECTION_USER_SETTINGS_ID } from "@/lib/config";
+import { Query, ID } from "appwrite";
 import { useToast } from "@/components/Toast";
+import { TourResetButton } from "@/components/ProductTour";
 
 export default function SettingsPage() {
     const [user, setUser] = useState(null);
@@ -11,6 +14,9 @@ export default function SettingsPage() {
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [dailyGoal, setDailyGoal] = useState(5);
+    const [settingsDocId, setSettingsDocId] = useState(null);
+    const [savingGoal, setSavingGoal] = useState(false);
     const toast = useToast();
 
     useEffect(() => {
@@ -19,6 +25,21 @@ export default function SettingsPage() {
                 const userData = await account.get();
                 setUser(userData);
                 setName(userData.name || "");
+                
+                // Fetch user settings (daily goal)
+                try {
+                    const settings = await databases.listDocuments(
+                        DATABASE_ID,
+                        COLLECTION_USER_SETTINGS_ID,
+                        [Query.equal("userId", userData.$id)]
+                    );
+                    if (settings.documents.length > 0) {
+                        setDailyGoal(settings.documents[0].dailyGoal);
+                        setSettingsDocId(settings.documents[0].$id);
+                    }
+                } catch (settingsError) {
+                    console.log("Settings collection may not exist yet:", settingsError.message);
+                }
             } catch (error) {
                 console.error("Error fetching user:", error);
             } finally {
@@ -65,6 +86,41 @@ export default function SettingsPage() {
             toast.error(error.message || "Failed to update password");
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleUpdateDailyGoal = async (e) => {
+        e.preventDefault();
+        if (dailyGoal < 1 || dailyGoal > 50) {
+            toast.error("Daily goal must be between 1 and 50");
+            return;
+        }
+        setSavingGoal(true);
+        try {
+            if (settingsDocId) {
+                // Update existing settings
+                await databases.updateDocument(
+                    DATABASE_ID,
+                    COLLECTION_USER_SETTINGS_ID,
+                    settingsDocId,
+                    { dailyGoal: dailyGoal }
+                );
+            } else {
+                // Create new settings
+                const newSettings = await databases.createDocument(
+                    DATABASE_ID,
+                    COLLECTION_USER_SETTINGS_ID,
+                    ID.unique(),
+                    { userId: user.$id, dailyGoal: dailyGoal }
+                );
+                setSettingsDocId(newSettings.$id);
+            }
+            toast.success("Daily goal updated successfully");
+        } catch (error) {
+            console.error("Error updating daily goal:", error);
+            toast.error(error.message || "Failed to update daily goal");
+        } finally {
+            setSavingGoal(false);
         }
     };
 
@@ -115,6 +171,40 @@ export default function SettingsPage() {
                             className="rounded-lg bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                         >
                             {saving ? "Saving..." : "Save Changes"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {/* Learning Goals Section */}
+            <div className="bg-white rounded-xl shadow-sm p-8">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Learning Goals</h2>
+                <p className="text-sm text-gray-500 mb-6">Set your daily learning target to stay on track</p>
+                <form onSubmit={handleUpdateDailyGoal} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Daily Goal (lessons per day)</label>
+                        <div className="flex items-center gap-4">
+                            <input
+                                type="number"
+                                value={dailyGoal}
+                                onChange={(e) => setDailyGoal(parseInt(e.target.value) || 1)}
+                                min="1"
+                                max="50"
+                                className="w-32 rounded-lg border border-gray-300 px-4 py-2 focus:border-indigo-500 focus:outline-none"
+                            />
+                            <span className="text-sm text-gray-500">lessons</span>
+                        </div>
+                        <p className="mt-2 text-xs text-gray-500">
+                            Complete {dailyGoal} {dailyGoal === 1 ? 'lesson' : 'lessons'} daily to maintain your streak
+                        </p>
+                    </div>
+                    <div className="flex justify-end">
+                        <button
+                            type="submit"
+                            disabled={savingGoal}
+                            className="rounded-lg bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                            {savingGoal ? "Saving..." : "Update Goal"}
                         </button>
                     </div>
                 </form>
@@ -171,6 +261,19 @@ export default function SettingsPage() {
                         </button>
                     </div>
                 </form>
+            </div>
+
+            {/* Help & Tour Section */}
+            <div className="bg-white rounded-xl shadow-sm p-8">
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">Help & Tour</h2>
+                <p className="text-sm text-gray-500 mb-6">Need a refresher on how to use SelfOS?</p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-sm text-gray-700">Product Tour</p>
+                        <p className="text-xs text-gray-500">Take a guided tour of all features</p>
+                    </div>
+                    <TourResetButton />
+                </div>
             </div>
 
             {/* Account Info */}

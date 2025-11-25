@@ -4,6 +4,7 @@ import { account } from "@/lib/appwrite";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
+import ProductTour from "@/components/ProductTour";
 
 export default function DashboardLayout({ children }) {
     const [user, setUser] = useState(null);
@@ -52,10 +53,10 @@ export default function DashboardLayout({ children }) {
     if (!user) return null;
 
     const navItems = [
-        { name: "Dashboard", href: "/dashboard", icon: "LayoutGrid" },
-        { name: "Courses", href: "/dashboard/courses", icon: "BookOpen" },
-        { name: "Notes", href: "/dashboard/notes", icon: "FileText" },
-        { name: "Settings", href: "/dashboard/settings", icon: "Settings" },
+        { name: "Dashboard", href: "/dashboard", icon: "LayoutGrid", tourId: "dashboard-link" },
+        { name: "Courses", href: "/dashboard/courses", icon: "BookOpen", tourId: "courses-link" },
+        { name: "Notes", href: "/dashboard/notes", icon: "FileText", tourId: "notes-link" },
+        { name: "Settings", href: "/dashboard/settings", icon: "Settings", tourId: "settings-link" },
     ];
 
     return (
@@ -90,6 +91,7 @@ export default function DashboardLayout({ children }) {
                             <Link
                                 key={item.name}
                                 href={item.href}
+                                data-tour={item.tourId}
                                 className={`flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${isActive
                                     ? "bg-indigo-50 text-indigo-600"
                                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
@@ -159,6 +161,9 @@ export default function DashboardLayout({ children }) {
                     {children}
                 </div>
             </main>
+
+            {/* Product Tour */}
+            <ProductTour />
         </div>
     );
 }

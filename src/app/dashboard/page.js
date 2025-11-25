@@ -14,6 +14,8 @@ export default function DashboardPage() {
         streak: 0,
         lessonsCompleted: 0,
         dailyGoal: 0,
+        dailyGoalTarget: 5,
+        completedToday: 0,
     });
     const toast = useToast();
 
@@ -81,7 +83,7 @@ export default function DashboardPage() {
             {/* Top Row Stats */}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 {/* Streak */}
-                <div className="rounded-2xl bg-white p-6 shadow-sm">
+                <div className="rounded-2xl bg-white p-6 shadow-sm" data-tour="streak-card">
                     <h3 className="text-sm font-medium text-gray-500">Current Streak</h3>
                     <div className="mt-2 flex items-baseline gap-2">
                         <span className="text-4xl font-bold text-gray-900">{stats.streak}</span>
@@ -108,7 +110,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Quick Capture */}
-                <div className="rounded-2xl bg-white p-6 shadow-sm">
+                <div className="rounded-2xl bg-white p-6 shadow-sm" data-tour="quick-capture">
                     <h3 className="text-sm font-medium text-gray-900 mb-4">Quick Capture</h3>
                     <textarea
                         value={note}
@@ -130,7 +132,7 @@ export default function DashboardPage() {
             {/* Bottom Row */}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 {/* Active Courses */}
-                <div className="col-span-2 rounded-2xl bg-white p-6 shadow-sm">
+                <div className="col-span-2 rounded-2xl bg-white p-6 shadow-sm" data-tour="active-courses">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-gray-900">Active Courses</h3>
                         <Link href="/dashboard/courses" className="text-sm text-indigo-600 hover:underline">
@@ -179,8 +181,13 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Daily Goal */}
-                <div className="rounded-2xl bg-white p-6 shadow-sm flex flex-col items-center justify-center">
-                    <h3 className="text-lg font-bold text-gray-900 mb-6">Daily Goal</h3>
+                <div className="rounded-2xl bg-white p-6 shadow-sm flex flex-col items-center justify-center" data-tour="daily-goal">
+                    <div className="flex items-center justify-between w-full mb-6">
+                        <h3 className="text-lg font-bold text-gray-900">Daily Goal</h3>
+                        <Link href="/dashboard/settings" className="text-xs text-indigo-600 hover:underline">
+                            Edit
+                        </Link>
+                    </div>
                     <div className="relative h-32 w-32">
                         {/* Simple Circle Progress Placeholder */}
                         <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
@@ -204,7 +211,9 @@ export default function DashboardPage() {
                             <span className="text-2xl font-bold text-gray-900">{stats.dailyGoal}%</span>
                         </div>
                     </div>
-                    <p className="mt-4 text-sm text-gray-500">{stats.completedToday || 0} of 5 lessons completed today</p>
+                    <p className="mt-4 text-sm text-gray-500">
+                        {stats.completedToday || 0} of {stats.dailyGoalTarget || 5} lessons completed today
+                    </p>
                 </div>
             </div>
         </div>

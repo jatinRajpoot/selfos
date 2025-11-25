@@ -65,7 +65,16 @@ const COLLECTIONS = [
         attributes: [
             { key: 'topicId', type: 'string', size: 255, required: true },
             { key: 'name', type: 'string', size: 255, required: true },
-            { key: 'fileUrl', type: 'url', required: true },
+            { key: 'type', type: 'string', size: 50, required: true }, // pdf, webpage, youtube, chatgpt, gemini, file
+            { key: 'url', type: 'url', required: false }, // External URL
+            { key: 'fileId', type: 'string', size: 255, required: false }, // Appwrite storage file ID
+        ]
+    },
+    {
+        name: 'user_settings',
+        attributes: [
+            { key: 'userId', type: 'string', size: 255, required: true },
+            { key: 'dailyGoal', type: 'integer', required: true }, // Number of lessons per day
         ]
     }
 ];

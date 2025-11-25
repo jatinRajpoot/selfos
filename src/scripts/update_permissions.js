@@ -33,6 +33,7 @@ const COLLECTION_PERMISSIONS = {
     'resources': PERMISSIONS.public,
     'progress': PERMISSIONS.private,
     'notes': PERMISSIONS.private,
+    'user_settings': PERMISSIONS.private,
 };
 
 async function updatePermissions() {

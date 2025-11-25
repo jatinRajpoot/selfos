@@ -52,6 +52,7 @@ export default function CoursesPage() {
                 <h1 className="text-2xl font-bold text-gray-900">All Courses</h1>
                 <Link
                     href="/dashboard/courses/create"
+                    data-tour="create-course-btn"
                     className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 w-full sm:w-auto text-center"
                 >
                     Create New Course
