@@ -61,7 +61,6 @@ const openApiSpec = {
                                 properties: {
                                     title: { type: "string", description: "Course title", maxLength: 255 },
                                     description: { type: "string", description: "Course description", maxLength: 5000 },
-                                    published: { type: "boolean", default: false },
                                     chapters: {
                                         type: "array",
                                         description: "Initial chapters to create (array of chapter title strings)",
@@ -111,7 +110,7 @@ const openApiSpec = {
             put: {
                 operationId: "updateCourse",
                 summary: "Update a course",
-                description: "Update course title, description, or published status.",
+                description: "Update course title or description.",
                 parameters: [
                     { name: "courseId", in: "path", required: true, schema: { type: "string" } }
                 ],
@@ -123,8 +122,7 @@ const openApiSpec = {
                                 type: "object",
                                 properties: {
                                     title: { type: "string", maxLength: 255 },
-                                    description: { type: "string", maxLength: 5000 },
-                                    published: { type: "boolean" }
+                                    description: { type: "string", maxLength: 5000 }
                                 }
                             }
                         }
@@ -468,7 +466,6 @@ const openApiSpec = {
                     id: { type: "string" },
                     title: { type: "string" },
                     description: { type: "string" },
-                    published: { type: "boolean" },
                     createdAt: { type: "string", format: "date-time" },
                     updatedAt: { type: "string", format: "date-time" }
                 }

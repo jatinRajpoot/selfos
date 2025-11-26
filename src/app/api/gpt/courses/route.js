@@ -27,7 +27,6 @@ export async function GET(request) {
             id: doc.$id,
             title: doc.title,
             description: doc.description || "",
-            published: doc.published,
             createdAt: doc.$createdAt,
             updatedAt: doc.$updatedAt
         }));
@@ -96,25 +95,18 @@ export async function POST(request) {
 
     try {
         const body = await request.json();
-        const { title, description, published = false, chapters = [] } = body;
+        const { title, description, chapters = [] } = body;
 
         if (!title || title.trim().length === 0) {
             return NextResponse.json({ error: "Title is required" }, { status: 400 });
         }
 
-        // Build course data - only include published if boolean attribute exists
+        // Build course data - excluding 'published' as it may not exist in DB schema
         const courseData = {
             title: title.trim().slice(0, 255),
             description: (description || "").slice(0, 5000),
             authorId: auth.userId
         };
-
-        // Try to include published field (may not exist in older schemas)
-        try {
-            courseData.published = Boolean(published);
-        } catch (e) {
-            // Ignore if published attribute doesn't exist
-        }
 
         // Create the course
         const course = await databases.createDocument(
@@ -151,7 +143,6 @@ export async function POST(request) {
             id: course.$id,
             title: course.title,
             description: course.description,
-            published: course.published,
             createdAt: course.$createdAt,
             chapters: createdChapters
         }, { status: 201 });

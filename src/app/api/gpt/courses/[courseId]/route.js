@@ -73,7 +73,6 @@ export async function GET(request, { params }) {
             id: course.$id,
             title: course.title,
             description: course.description || "",
-            published: course.published,
             createdAt: course.$createdAt,
             updatedAt: course.$updatedAt,
             chapters,
@@ -127,9 +126,6 @@ export async function PUT(request, { params }) {
         if (body.description !== undefined) {
             updates.description = body.description.slice(0, 5000);
         }
-        if (body.published !== undefined) {
-            updates.published = Boolean(body.published);
-        }
 
         if (Object.keys(updates).length === 0) {
             return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
@@ -146,7 +142,6 @@ export async function PUT(request, { params }) {
             id: updated.$id,
             title: updated.title,
             description: updated.description,
-            published: updated.published,
             updatedAt: updated.$updatedAt
         });
     } catch (error) {
