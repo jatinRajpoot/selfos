@@ -64,12 +64,9 @@ const openApiSpec = {
                                     published: { type: "boolean", default: false },
                                     chapters: {
                                         type: "array",
-                                        description: "Initial chapters to create",
+                                        description: "Initial chapters to create (array of chapter title strings)",
                                         items: {
-                                            oneOf: [
-                                                { type: "string" },
-                                                { type: "object", properties: { title: { type: "string" } } }
-                                            ]
+                                            type: "string"
                                         }
                                     }
                                 }
@@ -183,7 +180,7 @@ const openApiSpec = {
             post: {
                 operationId: "addChapters",
                 summary: "Add chapters to a course",
-                description: "Add one or more chapters to an existing course.",
+                description: "Add one or more chapters to an existing course. Provide either a single 'title' or an array of 'chapters'.",
                 parameters: [
                     { name: "courseId", in: "path", required: true, schema: { type: "string" } }
                 ],
@@ -192,28 +189,20 @@ const openApiSpec = {
                     content: {
                         "application/json": {
                             schema: {
-                                oneOf: [
-                                    {
-                                        type: "object",
-                                        required: ["title"],
-                                        properties: { title: { type: "string" } }
+                                type: "object",
+                                properties: {
+                                    title: { 
+                                        type: "string",
+                                        description: "Single chapter title (use this OR chapters array)"
                                     },
-                                    {
-                                        type: "object",
-                                        required: ["chapters"],
-                                        properties: {
-                                            chapters: {
-                                                type: "array",
-                                                items: {
-                                                    oneOf: [
-                                                        { type: "string" },
-                                                        { type: "object", properties: { title: { type: "string" } } }
-                                                    ]
-                                                }
-                                            }
+                                    chapters: {
+                                        type: "array",
+                                        description: "Array of chapter titles (use this OR single title)",
+                                        items: {
+                                            type: "string"
                                         }
                                     }
-                                ]
+                                }
                             }
                         }
                     }
@@ -617,7 +606,8 @@ const openApiSpec = {
 export async function GET(request) {
     // Get the host from request to populate the server URL
     const host = request.headers.get("host");
-    const protocol = request.headers.get("x-forwarded-proto") || "https";
+    // Always use HTTPS for production
+    const protocol = "https";
     
     const spec = {
         ...openApiSpec,
