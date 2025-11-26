@@ -102,17 +102,26 @@ export async function POST(request) {
             return NextResponse.json({ error: "Title is required" }, { status: 400 });
         }
 
+        // Build course data - only include published if boolean attribute exists
+        const courseData = {
+            title: title.trim().slice(0, 255),
+            description: (description || "").slice(0, 5000),
+            authorId: auth.userId
+        };
+
+        // Try to include published field (may not exist in older schemas)
+        try {
+            courseData.published = Boolean(published);
+        } catch (e) {
+            // Ignore if published attribute doesn't exist
+        }
+
         // Create the course
         const course = await databases.createDocument(
             DATABASE_ID,
             COLLECTION_COURSES_ID,
             ID.unique(),
-            {
-                title: title.trim().slice(0, 255),
-                description: (description || "").slice(0, 5000),
-                published: Boolean(published),
-                authorId: auth.userId
-            }
+            courseData
         );
 
         // Create chapters if provided
