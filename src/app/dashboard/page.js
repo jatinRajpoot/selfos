@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { databases, account } from "@/lib/appwrite";
 import { COLLECTION_NOTES_ID, COLLECTION_COURSES_ID, DATABASE_ID } from "@/lib/config";
 import { ID, Query } from "appwrite";
@@ -12,7 +13,7 @@ export default function DashboardPage() {
     const [courses, setCourses] = useState([]);
     const [stats, setStats] = useState({
         streak: 0,
-        lessonsCompleted: 0,
+        chaptersCompleted: 0,
         dailyGoal: 0,
         dailyGoalTarget: 5,
         completedToday: 0,
@@ -65,7 +66,6 @@ export default function DashboardPage() {
                     content: note,
                     courseId: "quick-capture", // Special ID for quick notes
                     chapterId: "quick-capture",
-                    topicId: "quick-capture",
                 }
             );
             setNote("");
@@ -100,11 +100,11 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Lessons Completed */}
+                {/* Chapters Completed */}
                 <div className="rounded-2xl bg-white p-6 shadow-sm">
-                    <h3 className="text-sm font-medium text-gray-500">Lessons Completed</h3>
+                    <h3 className="text-sm font-medium text-gray-500">Chapters Completed</h3>
                     <div className="mt-2">
-                        <span className="text-4xl font-bold text-gray-900">{stats.lessonsCompleted}</span>
+                        <span className="text-4xl font-bold text-gray-900">{stats.chaptersCompleted}</span>
                     </div>
                     <p className="mt-2 text-sm text-green-600 font-medium">+0 this week</p>
                 </div>
@@ -154,9 +154,9 @@ export default function DashboardPage() {
                                     href={`/dashboard/courses/${course.$id}`}
                                     className="flex items-center gap-4 p-4 rounded-lg border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group"
                                 >
-                                    <div className="h-16 w-16 rounded-lg bg-indigo-100 flex-shrink-0 overflow-hidden">
+                                    <div className="h-16 w-16 rounded-lg bg-indigo-100 flex-shrink-0 overflow-hidden relative">
                                         {course.coverImage ? (
-                                            <img src={course.coverImage} alt={course.title} className="h-full w-full object-cover" />
+                                            <Image src={course.coverImage} alt={course.title} fill sizes="64px" className="object-cover" unoptimized />
                                         ) : (
                                             <div className="h-full w-full flex items-center justify-center bg-indigo-100 text-indigo-600 text-xl font-bold">
                                                 {course.title.charAt(0)}
@@ -212,7 +212,7 @@ export default function DashboardPage() {
                         </div>
                     </div>
                     <p className="mt-4 text-sm text-gray-500">
-                        {stats.completedToday || 0} of {stats.dailyGoalTarget || 5} lessons completed today
+                        {stats.completedToday || 0} of {stats.dailyGoalTarget || 5} chapters completed today
                     </p>
                 </div>
             </div>

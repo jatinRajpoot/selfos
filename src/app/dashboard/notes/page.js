@@ -1,17 +1,19 @@
 "use client";
 import { useState, useEffect } from "react";
-import { databases, account } from "@/lib/appwrite";
+import { databases, account, storage } from "@/lib/appwrite";
 import { 
     COLLECTION_NOTES_ID, 
     COLLECTION_COURSES_ID, 
     COLLECTION_CHAPTERS_ID, 
-    COLLECTION_TOPICS_ID, 
+    COLLECTION_IMAGE_NOTES_ID,
+    BUCKET_ID,
     DATABASE_ID 
 } from "@/lib/config";
 import { Query } from "appwrite";
 import { NoteCardSkeleton } from "@/components/Skeleton";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { ImageNoteViewer } from "@/components/ImageNotesUploader";
 import { 
     FolderIcon, 
     FolderOpenIcon, 
@@ -22,14 +24,17 @@ import {
     LayersIcon,
     StickyNoteIcon,
     PencilIcon,
-    Trash2Icon
+    Trash2Icon,
+    ImageIcon
 } from "lucide-react";
 
 // Folder Item Component for Course level
-function CourseFolderItem({ course, chapters, topics, notes, expandedCourses, expandedChapters, expandedTopics, toggleCourse, toggleChapter, toggleTopic, onEdit, onDelete, editingNote, editContent, setEditContent, handleSaveEdit, handleCancelEdit, saving }) {
+function CourseFolderItem({ course, chapters, notes, imageNotes, expandedCourses, expandedChapters, toggleCourse, toggleChapter, onEdit, onDelete, onViewImage, onDeleteImage, editingNote, editContent, setEditContent, handleSaveEdit, handleCancelEdit, saving }) {
     const isExpanded = expandedCourses.has(course.$id);
     const courseChapters = chapters.filter(ch => ch.courseId === course.$id);
-    const courseNotesCount = notes.filter(n => n.courseId === course.$id).length;
+    const courseTextNotesCount = notes.filter(n => n.courseId === course.$id).length;
+    const courseImageNotesCount = imageNotes.filter(n => n.courseId === course.$id).length;
+    const courseNotesCount = courseTextNotesCount + courseImageNotesCount;
 
     return (
         <div className="select-none">
@@ -60,14 +65,14 @@ function CourseFolderItem({ course, chapters, topics, notes, expandedCourses, ex
                             <ChapterFolderItem 
                                 key={chapter.$id}
                                 chapter={chapter}
-                                topics={topics}
                                 notes={notes}
+                                imageNotes={imageNotes}
                                 expandedChapters={expandedChapters}
-                                expandedTopics={expandedTopics}
                                 toggleChapter={toggleChapter}
-                                toggleTopic={toggleTopic}
                                 onEdit={onEdit}
                                 onDelete={onDelete}
+                                onViewImage={onViewImage}
+                                onDeleteImage={onDeleteImage}
                                 editingNote={editingNote}
                                 editContent={editContent}
                                 setEditContent={setEditContent}
@@ -84,10 +89,11 @@ function CourseFolderItem({ course, chapters, topics, notes, expandedCourses, ex
 }
 
 // Folder Item Component for Chapter level
-function ChapterFolderItem({ chapter, topics, notes, expandedChapters, expandedTopics, toggleChapter, toggleTopic, onEdit, onDelete, editingNote, editContent, setEditContent, handleSaveEdit, handleCancelEdit, saving }) {
+function ChapterFolderItem({ chapter, notes, imageNotes, expandedChapters, toggleChapter, onEdit, onDelete, onViewImage, onDeleteImage, editingNote, editContent, setEditContent, handleSaveEdit, handleCancelEdit, saving }) {
     const isExpanded = expandedChapters.has(chapter.$id);
-    const chapterTopics = topics.filter(t => t.chapterId === chapter.$id);
-    const chapterNotesCount = notes.filter(n => n.chapterId === chapter.$id).length;
+    const chapterNotes = notes.filter(n => n.chapterId === chapter.$id);
+    const chapterImageNotes = imageNotes.filter(n => n.chapterId === chapter.$id);
+    const totalNotes = chapterNotes.length + chapterImageNotes.length;
 
     return (
         <div>
@@ -104,33 +110,50 @@ function ChapterFolderItem({ chapter, topics, notes, expandedChapters, expandedT
                     <LayersIcon className="w-4 h-4 text-amber-500" />
                 )}
                 <span className="text-sm font-medium text-gray-700 flex-1">{chapter.title}</span>
-                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                    {chapterNotesCount}
-                </span>
+                <div className="flex items-center gap-1">
+                    {chapterImageNotes.length > 0 && (
+                        <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <ImageIcon className="w-3 h-3" />
+                            {chapterImageNotes.length}
+                        </span>
+                    )}
+                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {totalNotes}
+                    </span>
+                </div>
             </div>
             
             {isExpanded && (
-                <div className="ml-6 border-l border-gray-100 pl-2">
-                    {chapterTopics.length === 0 ? (
-                        <div className="py-2 px-3 text-sm text-gray-400 italic">No topics</div>
+                <div className="ml-6 border-l border-gray-100 pl-2 space-y-2 py-2">
+                    {totalNotes === 0 ? (
+                        <div className="py-2 px-3 text-sm text-gray-400 italic">No notes for this chapter</div>
                     ) : (
-                        chapterTopics.map(topic => (
-                            <TopicFolderItem 
-                                key={topic.$id}
-                                topic={topic}
-                                notes={notes}
-                                expandedTopics={expandedTopics}
-                                toggleTopic={toggleTopic}
-                                onEdit={onEdit}
-                                onDelete={onDelete}
-                                editingNote={editingNote}
-                                editContent={editContent}
-                                setEditContent={setEditContent}
-                                handleSaveEdit={handleSaveEdit}
-                                handleCancelEdit={handleCancelEdit}
-                                saving={saving}
-                            />
-                        ))
+                        <>
+                            {/* Text Notes */}
+                            {chapterNotes.map(note => (
+                                <NoteItem 
+                                    key={note.$id}
+                                    note={note}
+                                    onEdit={onEdit}
+                                    onDelete={onDelete}
+                                    editingNote={editingNote}
+                                    editContent={editContent}
+                                    setEditContent={setEditContent}
+                                    handleSaveEdit={handleSaveEdit}
+                                    handleCancelEdit={handleCancelEdit}
+                                    saving={saving}
+                                />
+                            ))}
+                            {/* Image Notes */}
+                            {chapterImageNotes.map(imageNote => (
+                                <ImageNoteItem 
+                                    key={imageNote.$id}
+                                    imageNote={imageNote}
+                                    onView={onViewImage}
+                                    onDelete={onDeleteImage}
+                                />
+                            ))}
+                        </>
                     )}
                 </div>
             )}
@@ -138,49 +161,78 @@ function ChapterFolderItem({ chapter, topics, notes, expandedChapters, expandedT
     );
 }
 
-// Folder Item Component for Topic level (contains notes)
-function TopicFolderItem({ topic, notes, expandedTopics, toggleTopic, onEdit, onDelete, editingNote, editContent, setEditContent, handleSaveEdit, handleCancelEdit, saving }) {
-    const isExpanded = expandedTopics.has(topic.$id);
-    const topicNotes = notes.filter(n => n.topicId === topic.$id);
+// Individual Image Note Item for folder view
+function ImageNoteItem({ imageNote, onView, onDelete }) {
+    const [previewUrl, setPreviewUrl] = useState(null);
+    
+    useEffect(() => {
+        try {
+            const ids = JSON.parse(imageNote.imageIds);
+            if (ids.length > 0) {
+                setPreviewUrl(storage.getFilePreview(BUCKET_ID, ids[0], 200, 200));
+            }
+        } catch (error) {
+            console.error("Error loading image preview:", error);
+        }
+    }, [imageNote.imageIds]);
+
+    const imageCount = JSON.parse(imageNote.imageIds || "[]").length;
 
     return (
-        <div>
-            <div 
-                onClick={() => toggleTopic(topic.$id)}
-                className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
-            >
-                <span className="text-gray-400 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
-                    <ChevronRightIcon className="w-3 h-3" />
-                </span>
-                <FileTextIcon className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm text-gray-600 flex-1">{topic.title}</span>
-                <span className="text-xs text-gray-400 bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">
-                    {topicNotes.length}
-                </span>
-            </div>
-            
-            {isExpanded && (
-                <div className="ml-6 pl-2 space-y-2 py-2">
-                    {topicNotes.length === 0 ? (
-                        <div className="py-2 px-3 text-sm text-gray-400 italic">No notes for this topic</div>
+        <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow group">
+            <div className="flex items-start gap-3">
+                <div 
+                    className="relative w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); onView && onView(imageNote); }}
+                >
+                    {previewUrl ? (
+                        <img
+                            src={previewUrl}
+                            alt={imageNote.caption || "Image note"}
+                            className="w-full h-full object-cover"
+                        />
                     ) : (
-                        topicNotes.map(note => (
-                            <NoteItem 
-                                key={note.$id}
-                                note={note}
-                                onEdit={onEdit}
-                                onDelete={onDelete}
-                                editingNote={editingNote}
-                                editContent={editContent}
-                                setEditContent={setEditContent}
-                                handleSaveEdit={handleSaveEdit}
-                                handleCancelEdit={handleCancelEdit}
-                                saving={saving}
-                            />
-                        ))
+                        <div className="w-full h-full flex items-center justify-center">
+                            <ImageIcon className="w-6 h-6 text-gray-400" />
+                        </div>
+                    )}
+                    {imageCount > 1 && (
+                        <div className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                            +{imageCount - 1}
+                        </div>
                     )}
                 </div>
-            )}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                        <ImageIcon className="w-4 h-4 text-indigo-500" />
+                        <span className="text-xs font-medium text-indigo-600">Image Note</span>
+                    </div>
+                    {imageNote.caption && (
+                        <p className="text-sm text-gray-700 line-clamp-2">{imageNote.caption}</p>
+                    )}
+                    <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-gray-400">
+                            {new Date(imageNote.$createdAt).toLocaleDateString()}
+                        </span>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onView && onView(imageNote); }}
+                                className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
+                                aria-label="View images"
+                            >
+                                <ImageIcon className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onDelete && onDelete(imageNote); }}
+                                className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                                aria-label="Delete image note"
+                            >
+                                <Trash2Icon className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
@@ -297,19 +349,19 @@ function QuickCaptureSection({ notes, onEdit, onDelete, editingNote, editContent
 
 export default function NotesPage() {
     const [notes, setNotes] = useState([]);
+    const [imageNotes, setImageNotes] = useState([]);
     const [courses, setCourses] = useState([]);
     const [chapters, setChapters] = useState([]);
-    const [topics, setTopics] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingNote, setEditingNote] = useState(null);
     const [editContent, setEditContent] = useState("");
     const [saving, setSaving] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: "", message: "", onConfirm: null });
+    const [viewingImageNote, setViewingImageNote] = useState(null);
     
     // Expanded state for folder structure
     const [expandedCourses, setExpandedCourses] = useState(new Set());
     const [expandedChapters, setExpandedChapters] = useState(new Set());
-    const [expandedTopics, setExpandedTopics] = useState(new Set());
     const [quickCaptureExpanded, setQuickCaptureExpanded] = useState(true);
     
     const toast = useToast();
@@ -319,12 +371,17 @@ export default function NotesPage() {
             const user = await account.get();
             
             // Fetch all data in parallel
-            const [notesRes, coursesRes, chaptersRes, topicsRes] = await Promise.all([
+            const [notesRes, imageNotesRes, coursesRes, chaptersRes] = await Promise.all([
                 databases.listDocuments(
                     DATABASE_ID,
                     COLLECTION_NOTES_ID,
                     [Query.equal("userId", user.$id), Query.orderDesc("$createdAt"), Query.limit(500)]
                 ),
+                COLLECTION_IMAGE_NOTES_ID ? databases.listDocuments(
+                    DATABASE_ID,
+                    COLLECTION_IMAGE_NOTES_ID,
+                    [Query.equal("userId", user.$id), Query.orderDesc("$createdAt"), Query.limit(500)]
+                ) : Promise.resolve({ documents: [] }),
                 databases.listDocuments(
                     DATABASE_ID,
                     COLLECTION_COURSES_ID,
@@ -334,28 +391,22 @@ export default function NotesPage() {
                     DATABASE_ID,
                     COLLECTION_CHAPTERS_ID,
                     [Query.limit(500)]
-                ),
-                databases.listDocuments(
-                    DATABASE_ID,
-                    COLLECTION_TOPICS_ID,
-                    [Query.limit(1000)]
                 )
             ]);
 
             setNotes(notesRes.documents);
+            setImageNotes(imageNotesRes.documents);
             setCourses(coursesRes.documents);
             
-            // Filter chapters and topics to only include those belonging to user's courses
+            // Filter chapters to only include those belonging to user's courses
             const courseIds = new Set(coursesRes.documents.map(c => c.$id));
             const userChapters = chaptersRes.documents.filter(ch => courseIds.has(ch.courseId));
             setChapters(userChapters);
             
-            const chapterIds = new Set(userChapters.map(ch => ch.$id));
-            const userTopics = topicsRes.documents.filter(t => chapterIds.has(t.chapterId));
-            setTopics(userTopics);
-            
-            // Auto-expand courses that have notes
-            const coursesWithNotes = new Set(notesRes.documents.map(n => n.courseId).filter(id => id !== "quick-capture"));
+            // Auto-expand courses that have notes (text or image)
+            const coursesWithTextNotes = notesRes.documents.map(n => n.courseId).filter(id => id !== "quick-capture");
+            const coursesWithImageNotes = imageNotesRes.documents.map(n => n.courseId);
+            const coursesWithNotes = new Set([...coursesWithTextNotes, ...coursesWithImageNotes]);
             setExpandedCourses(coursesWithNotes);
             
         } catch (error) {
@@ -389,18 +440,6 @@ export default function NotesPage() {
                 next.delete(chapterId);
             } else {
                 next.add(chapterId);
-            }
-            return next;
-        });
-    };
-
-    const toggleTopic = (topicId) => {
-        setExpandedTopics(prev => {
-            const next = new Set(prev);
-            if (next.has(topicId)) {
-                next.delete(topicId);
-            } else {
-                next.add(topicId);
             }
             return next;
         });
@@ -458,9 +497,45 @@ export default function NotesPage() {
         });
     };
 
-    // Get courses that have notes (excluding quick-capture)
+    const handleDeleteImageNote = (imageNote) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: "Delete Image Note",
+            message: `Are you sure you want to delete this image note with ${JSON.parse(imageNote.imageIds).length} image(s)? This action cannot be undone.`,
+            onConfirm: async () => {
+                try {
+                    // Delete files from storage
+                    const ids = JSON.parse(imageNote.imageIds);
+                    for (const id of ids) {
+                        try {
+                            await storage.deleteFile(BUCKET_ID, id);
+                        } catch (err) {
+                            console.error("Error deleting file:", err);
+                        }
+                    }
+                    
+                    // Delete document
+                    await databases.deleteDocument(DATABASE_ID, COLLECTION_IMAGE_NOTES_ID, imageNote.$id);
+                    toast.success("Image note deleted successfully");
+                    fetchData();
+                } catch (error) {
+                    console.error("Error deleting image note:", error);
+                    toast.error("Failed to delete image note");
+                } finally {
+                    setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null });
+                }
+            }
+        });
+    };
+
+    const handleViewImageNote = (imageNote) => {
+        setViewingImageNote(imageNote);
+    };
+
+    // Get courses that have notes (text or image, excluding quick-capture)
     const coursesWithNotes = courses.filter(course => 
-        notes.some(note => note.courseId === course.$id)
+        notes.some(note => note.courseId === course.$id) ||
+        imageNotes.some(note => note.courseId === course.$id)
     );
 
     // Get orphaned notes (notes with courseId that doesn't match any owned course, excluding quick-capture)
@@ -468,9 +543,10 @@ export default function NotesPage() {
     const orphanedNotes = notes.filter(note => 
         note.courseId !== "quick-capture" && !courseIds.has(note.courseId)
     );
+    const orphanedImageNotes = imageNotes.filter(note => !courseIds.has(note.courseId));
 
     // Calculate actual displayable notes count (excluding orphaned ones)
-    const displayableNotesCount = notes.length - orphanedNotes.length;
+    const displayableNotesCount = (notes.length - orphanedNotes.length) + (imageNotes.length - orphanedImageNotes.length);
 
     if (loading) {
         return (
@@ -491,13 +567,21 @@ export default function NotesPage() {
         <div>
             <div className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">My Notes</h1>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <FolderIcon className="w-4 h-4" />
-                    <span>{displayableNotesCount} total notes</span>
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-2">
+                        <FolderIcon className="w-4 h-4" />
+                        <span>{displayableNotesCount} total notes</span>
+                    </div>
+                    {imageNotes.length > 0 && (
+                        <div className="flex items-center gap-1 text-indigo-600">
+                            <ImageIcon className="w-4 h-4" />
+                            <span>{imageNotes.length - orphanedImageNotes.length} images</span>
+                        </div>
+                    )}
                 </div>
             </div>
             
-            {notes.length === 0 ? (
+            {notes.length === 0 && imageNotes.length === 0 ? (
                 <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-12">
                     <div className="text-center">
                         <div className="mx-auto w-24 h-24 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
@@ -526,7 +610,7 @@ export default function NotesPage() {
                     
                     {/* Course Folders */}
                     <div className="space-y-1">
-                        {coursesWithNotes.length === 0 && notes.filter(n => n.courseId !== "quick-capture").length === 0 ? (
+                        {coursesWithNotes.length === 0 && notes.filter(n => n.courseId !== "quick-capture").length === 0 && imageNotes.length === 0 ? (
                             <div className="py-8 text-center text-gray-400">
                                 <p>No course notes yet. Notes will appear here organized by course.</p>
                             </div>
@@ -536,16 +620,16 @@ export default function NotesPage() {
                                     key={course.$id}
                                     course={course}
                                     chapters={chapters}
-                                    topics={topics}
                                     notes={notes}
+                                    imageNotes={imageNotes}
                                     expandedCourses={expandedCourses}
                                     expandedChapters={expandedChapters}
-                                    expandedTopics={expandedTopics}
                                     toggleCourse={toggleCourse}
                                     toggleChapter={toggleChapter}
-                                    toggleTopic={toggleTopic}
                                     onEdit={handleEdit}
                                     onDelete={handleDelete}
+                                    onViewImage={handleViewImageNote}
+                                    onDeleteImage={handleDeleteImageNote}
                                     editingNote={editingNote}
                                     editContent={editContent}
                                     setEditContent={setEditContent}
@@ -566,6 +650,17 @@ export default function NotesPage() {
                 onConfirm={confirmDialog.onConfirm}
                 onCancel={() => setConfirmDialog({ isOpen: false, title: "", message: "", onConfirm: null })}
             />
+
+            {/* Image Note Viewer Modal */}
+            {viewingImageNote && (
+                <ImageNoteViewer
+                    imageNote={viewingImageNote}
+                    onClose={() => setViewingImageNote(null)}
+                    onDelete={(deletedId) => {
+                        setImageNotes(prev => prev.filter(note => note.$id !== deletedId));
+                    }}
+                />
+            )}
         </div>
     );
 }

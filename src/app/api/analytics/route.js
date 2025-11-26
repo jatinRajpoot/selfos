@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { databases, users } from "@/lib/server/appwrite";
-import { COLLECTION_PROGRESS_ID, COLLECTION_USER_SETTINGS_ID, COLLECTION_TOPICS_ID, COLLECTION_CHAPTERS_ID, COLLECTION_COURSES_ID, DATABASE_ID } from "@/lib/config";
+import { COLLECTION_PROGRESS_ID, COLLECTION_USER_SETTINGS_ID, COLLECTION_CHAPTERS_ID, COLLECTION_COURSES_ID, DATABASE_ID } from "@/lib/config";
 import { Query, Client, Account } from "node-appwrite";
 
 export async function GET(request) {
@@ -29,30 +29,18 @@ export async function GET(request) {
         const userCourseIds = new Set(userCourses.documents.map(c => c.$id));
 
         // Get all chapters for user's courses
-        let validTopicIds = new Set();
+        let validChapterIds = new Set();
         if (userCourseIds.size > 0) {
             const chapters = await databases.listDocuments(
                 DATABASE_ID,
                 COLLECTION_CHAPTERS_ID,
                 [Query.limit(1000)]
             );
-            const userChapterIds = chapters.documents
-                .filter(ch => userCourseIds.has(ch.courseId))
-                .map(ch => ch.$id);
-
-            // Get all topics for user's chapters
-            if (userChapterIds.length > 0) {
-                const topics = await databases.listDocuments(
-                    DATABASE_ID,
-                    COLLECTION_TOPICS_ID,
-                    [Query.limit(2000)]
-                );
-                validTopicIds = new Set(
-                    topics.documents
-                        .filter(t => userChapterIds.includes(t.chapterId))
-                        .map(t => t.$id)
-                );
-            }
+            validChapterIds = new Set(
+                chapters.documents
+                    .filter(ch => userCourseIds.has(ch.courseId))
+                    .map(ch => ch.$id)
+            );
         }
 
         const progress = await databases.listDocuments(
@@ -61,11 +49,11 @@ export async function GET(request) {
             [Query.equal("userId", userId), Query.equal("status", "completed")]
         );
 
-        // Filter progress to only include valid topics (not orphaned)
-        const validDocuments = progress.documents.filter(doc => validTopicIds.has(doc.topicId));
+        // Filter progress to only include valid chapters (not orphaned)
+        const validDocuments = progress.documents.filter(doc => validChapterIds.has(doc.chapterId));
 
-        // Calculate Lessons Completed (only valid, non-orphaned progress)
-        const lessonsCompleted = validDocuments.length;
+        // Calculate Chapters Completed (only valid, non-orphaned progress)
+        const chaptersCompleted = validDocuments.length;
 
         // Get user's daily goal (default to 5 if not set)
         let userDailyGoal = 5;
@@ -134,7 +122,7 @@ export async function GET(request) {
 
         return NextResponse.json({
             streak,
-            lessonsCompleted,
+            chaptersCompleted,
             dailyGoal: dailyGoalPercent,
             completedToday,
             dailyGoalTarget: userDailyGoal

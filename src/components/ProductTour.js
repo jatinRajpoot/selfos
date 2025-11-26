@@ -40,7 +40,7 @@ const TOUR_STEPS = [
     {
         id: "courses",
         title: "Your Courses",
-        description: "Access all your courses here. Create structured learning paths with chapters and topics to master any subject.",
+        description: "Access all your courses here. Create structured learning paths with chapters to master any subject.",
         target: "[data-tour='courses-link']",
         placement: "right",
         icon: BookOpen,
@@ -48,7 +48,7 @@ const TOUR_STEPS = [
     {
         id: "create-course",
         title: "Create Your First Course",
-        description: "Ready to start learning? Create a course by clicking 'Create New Course'. Add chapters and topics to organize your learning material.",
+        description: "Ready to start learning? Create a course by clicking 'Create New Course'. Add chapters to organize your learning material.",
         target: "[data-tour='create-course-btn']",
         placement: "bottom",
         icon: Plus,
@@ -56,7 +56,7 @@ const TOUR_STEPS = [
     {
         id: "notes",
         title: "Your Notes",
-        description: "All your notes organized in one place! Notes are automatically organized by course, chapter, and topic for easy reference.",
+        description: "All your notes organized in one place! Notes are automatically organized by course and chapter for easy reference.",
         target: "[data-tour='notes-link']",
         placement: "right",
         icon: FileText,

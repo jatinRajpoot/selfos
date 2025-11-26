@@ -1,34 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
-import { databases, account } from "@/lib/appwrite";
-import { Query } from "appwrite";
-import { COLLECTION_COURSES_ID, DATABASE_ID } from "@/lib/config";
+import Image from "next/image";
 import Link from "next/link";
+import { useCourses } from "@/hooks";
 import { CourseCardSkeleton } from "@/components/Skeleton";
 
 export default function CoursesPage() {
-    const [courses, setCourses] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchCourses = async () => {
-            try {
-                const user = await account.get();
-                const response = await databases.listDocuments(
-                    DATABASE_ID,
-                    COLLECTION_COURSES_ID,
-                    [Query.equal("authorId", user.$id)]
-                );
-                setCourses(response.documents);
-            } catch (error) {
-                console.error("Error fetching courses:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchCourses();
-    }, []);
+    const { courses, isLoading: loading } = useCourses();
 
     if (loading) {
         return (
@@ -85,7 +62,14 @@ export default function CoursesPage() {
                         <div className="overflow-hidden rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md border border-gray-100">
                             <div className="aspect-video w-full bg-gray-200 relative">
                                 {course.coverImage ? (
-                                    <img src={course.coverImage} alt={course.title} className="h-full w-full object-cover" />
+                                    <Image
+                                        src={course.coverImage}
+                                        alt={course.title}
+                                        fill
+                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                        className="object-cover"
+                                        unoptimized
+                                    />
                                 ) : (
                                     <div className="absolute inset-0 flex items-center justify-center bg-indigo-50 text-indigo-200">
                                         <span className="text-4xl font-bold opacity-50">{course.title.charAt(0)}</span>
@@ -97,7 +81,7 @@ export default function CoursesPage() {
                                         e.stopPropagation();
                                         window.location.href = `/dashboard/courses/create/${course.$id}`;
                                     }}
-                                    className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-sm text-gray-600 hover:text-indigo-600 hover:bg-white transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                    className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-sm text-gray-600 hover:text-indigo-600 hover:bg-white transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
                                     aria-label={`Edit ${course.title}`}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

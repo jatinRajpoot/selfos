@@ -12,6 +12,16 @@ const nextConfig = {
                 hostname: '*.appwrite.io',
                 pathname: '/**',
             },
+            {
+                protocol: 'http',
+                hostname: 'localhost',
+                pathname: '/**',
+            },
+            {
+                protocol: 'http',
+                hostname: '127.0.0.1',
+                pathname: '/**',
+            },
         ],
     },
     async headers() {

@@ -29,11 +29,11 @@ const PERMISSIONS = {
 const COLLECTION_PERMISSIONS = {
     'courses': PERMISSIONS.public,
     'chapters': PERMISSIONS.public,
-    'topics': PERMISSIONS.public,
     'resources': PERMISSIONS.public,
     'progress': PERMISSIONS.private,
     'notes': PERMISSIONS.private,
     'user_settings': PERMISSIONS.private,
+    'image_notes': PERMISSIONS.private,
 };
 
 async function updatePermissions() {

@@ -17,7 +17,6 @@ const COLLECTIONS = [
         attributes: [
             { key: 'title', type: 'string', size: 255, required: true },
             { key: 'description', type: 'string', size: 5000, required: false },
-            { key: 'coverImage', type: 'url', required: false },
             { key: 'published', type: 'boolean', required: true, default: false },
             { key: 'authorId', type: 'string', size: 255, required: true },
         ]
@@ -31,21 +30,10 @@ const COLLECTIONS = [
         ]
     },
     {
-        name: 'topics',
-        attributes: [
-            { key: 'chapterId', type: 'string', size: 255, required: true },
-            { key: 'title', type: 'string', size: 255, required: true },
-            { key: 'content', type: 'string', size: 100000, required: false }, // Markdown content
-            { key: 'videoUrl', type: 'url', required: false },
-            { key: 'type', type: 'string', size: 50, required: true }, // video, text, youtube, article
-            { key: 'order', type: 'integer', required: true },
-        ]
-    },
-    {
         name: 'progress',
         attributes: [
             { key: 'userId', type: 'string', size: 255, required: true },
-            { key: 'topicId', type: 'string', size: 255, required: true },
+            { key: 'chapterId', type: 'string', size: 255, required: true },
             { key: 'status', type: 'string', size: 50, required: true }, // completed, in-progress
             { key: 'completedAt', type: 'datetime', required: false },
         ]
@@ -56,14 +44,13 @@ const COLLECTIONS = [
             { key: 'userId', type: 'string', size: 255, required: true },
             { key: 'courseId', type: 'string', size: 255, required: true },
             { key: 'chapterId', type: 'string', size: 255, required: true },
-            { key: 'topicId', type: 'string', size: 255, required: true },
             { key: 'content', type: 'string', size: 10000, required: true },
         ]
     },
     {
         name: 'resources',
         attributes: [
-            { key: 'topicId', type: 'string', size: 255, required: true },
+            { key: 'chapterId', type: 'string', size: 255, required: true },
             { key: 'name', type: 'string', size: 255, required: true },
             { key: 'type', type: 'string', size: 50, required: true }, // pdf, webpage, youtube, chatgpt, gemini, file
             { key: 'url', type: 'url', required: false }, // External URL
@@ -74,7 +61,27 @@ const COLLECTIONS = [
         name: 'user_settings',
         attributes: [
             { key: 'userId', type: 'string', size: 255, required: true },
-            { key: 'dailyGoal', type: 'integer', required: true }, // Number of lessons per day
+            { key: 'dailyGoal', type: 'integer', required: true }, // Number of chapters per day
+        ]
+    },
+    {
+        name: 'image_notes',
+        attributes: [
+            { key: 'userId', type: 'string', size: 255, required: true },
+            { key: 'courseId', type: 'string', size: 255, required: true },
+            { key: 'chapterId', type: 'string', size: 255, required: true },
+            { key: 'imageIds', type: 'string', size: 5000, required: true }, // JSON array of file IDs
+            { key: 'caption', type: 'string', size: 1000, required: false }, // Optional caption for the images
+        ]
+    },
+    {
+        name: 'api_keys',
+        attributes: [
+            { key: 'userId', type: 'string', size: 255, required: true },
+            { key: 'keyHash', type: 'string', size: 64, required: true }, // SHA-256 hash
+            { key: 'name', type: 'string', size: 100, required: true }, // Friendly name for the key
+            { key: 'createdAt', type: 'datetime', required: true },
+            { key: 'lastUsed', type: 'datetime', required: false },
         ]
     }
 ];

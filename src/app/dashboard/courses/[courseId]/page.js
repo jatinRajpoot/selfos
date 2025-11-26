@@ -1,171 +1,174 @@
 "use client";
-import { useState, useEffect, use } from "react";
-import { databases, account } from "@/lib/appwrite";
-import { COLLECTION_COURSES_ID, COLLECTION_CHAPTERS_ID, COLLECTION_TOPICS_ID, COLLECTION_PROGRESS_ID, COLLECTION_NOTES_ID, COLLECTION_RESOURCES_ID, DATABASE_ID, RESOURCE_TYPES } from "@/lib/config";
+import { useState, useEffect, use, useCallback } from "react";
+import { databases, account, storage } from "@/lib/appwrite";
+import { COLLECTION_COURSES_ID, COLLECTION_CHAPTERS_ID, COLLECTION_PROGRESS_ID, COLLECTION_NOTES_ID, COLLECTION_RESOURCES_ID, COLLECTION_IMAGE_NOTES_ID, DATABASE_ID, RESOURCE_TYPES, BUCKET_ID } from "@/lib/config";
 import { ID, Query } from "appwrite";
 import { useToast } from "@/components/Toast";
-import { ChevronLeft, ChevronRight, FileText, Link as LinkIcon, Youtube, MessageSquare, Sparkles, File, ExternalLink } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import { ChevronDown, ChevronRight, FileText, Link as LinkIcon, Youtube, MessageSquare, Sparkles, File, ExternalLink, ImageIcon, Trash2Icon, CheckCircle2, Circle, StickyNote, BookOpen } from "lucide-react";
+import ImageNotesUploader, { ImageNoteViewer, ImageNoteCard } from "@/components/ImageNotesUploader";
+import { useUser } from "@/hooks";
+import { CoursePlayerSkeleton } from "@/components/Skeleton";
+import Link from "next/link";
 
-export default function CoursePlayerPage({ params }) {
+export default function CourseDetailPage({ params }) {
     const { courseId } = use(params);
+    const { user } = useUser();
     const [course, setCourse] = useState(null);
     const [chapters, setChapters] = useState([]);
-    const [activeTopic, setActiveTopic] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState("notes"); // notes, resources
+    const [expandedChapter, setExpandedChapter] = useState(null);
+    const [activeTab, setActiveTab] = useState("notes"); // notes, images, resources
     const [noteContent, setNoteContent] = useState("");
     const [savingNote, setSavingNote] = useState(false);
-    const [markingComplete, setMarkingComplete] = useState(false);
-    const [completedTopics, setCompletedTopics] = useState(new Set());
-    const [resources, setResources] = useState([]);
+    const [markingComplete, setMarkingComplete] = useState(null);
+    const [completedChapters, setCompletedChapters] = useState(new Set());
+    const [chapterResources, setChapterResources] = useState({});
+    const [chapterImageNotes, setChapterImageNotes] = useState({});
+    const [viewingImageNote, setViewingImageNote] = useState(null);
     const toast = useToast();
-
-    // Helper function to get all topics in order
-    const getAllTopics = () => {
-        const allTopics = [];
-        chapters.forEach(chapter => {
-            chapter.topics.forEach(topic => {
-                allTopics.push({ ...topic, chapterTitle: chapter.title });
-            });
-        });
-        return allTopics;
-    };
-
-    // Get adjacent topic (next or previous)
-    const getAdjacentTopic = (direction) => {
-        const allTopics = getAllTopics();
-        const currentIndex = allTopics.findIndex(t => t.$id === activeTopic?.$id);
-        if (currentIndex === -1) return null;
-        
-        const newIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
-        if (newIndex < 0 || newIndex >= allTopics.length) return null;
-        return allTopics[newIndex];
-    };
-
-    const handleNavigate = (direction) => {
-        const topic = getAdjacentTopic(direction);
-        if (topic) {
-            setActiveTopic(topic);
-            setNoteContent("");
-        }
-    };
 
     // Get resource icon based on type
     const getResourceIcon = (type) => {
         switch (type) {
             case RESOURCE_TYPES?.PDF:
+            case 'pdf':
                 return <FileText className="w-5 h-5 text-red-500" />;
             case RESOURCE_TYPES?.YOUTUBE:
+            case 'youtube':
                 return <Youtube className="w-5 h-5 text-red-600" />;
             case RESOURCE_TYPES?.CHATGPT:
+            case 'chatgpt':
                 return <MessageSquare className="w-5 h-5 text-green-600" />;
             case RESOURCE_TYPES?.GEMINI:
+            case 'gemini':
                 return <Sparkles className="w-5 h-5 text-blue-500" />;
             case RESOURCE_TYPES?.WEBPAGE:
+            case 'webpage':
                 return <LinkIcon className="w-5 h-5 text-indigo-500" />;
             default:
                 return <File className="w-5 h-5 text-gray-500" />;
         }
     };
 
+    // Fetch course data
     useEffect(() => {
-        fetchData();
-    }, [courseId]);
+        const fetchData = async () => {
+            if (!user) return;
+            try {
+                // Fetch course
+                const courseData = await databases.getDocument(DATABASE_ID, COLLECTION_COURSES_ID, courseId);
+                setCourse(courseData);
 
-    const fetchData = async () => {
-        try {
-            const user = await account.get();
-            const courseData = await databases.getDocument(DATABASE_ID, COLLECTION_COURSES_ID, courseId);
-            setCourse(courseData);
-
-            const chaptersData = await databases.listDocuments(
-                DATABASE_ID,
-                COLLECTION_CHAPTERS_ID,
-                [Query.equal("courseId", courseId), Query.orderAsc("order")]
-            );
-
-            const chaptersWithTopics = await Promise.all(chaptersData.documents.map(async (chapter) => {
-                const topicsData = await databases.listDocuments(
+                // Fetch chapters
+                const chaptersData = await databases.listDocuments(
                     DATABASE_ID,
-                    COLLECTION_TOPICS_ID,
-                    [Query.equal("chapterId", chapter.$id), Query.orderAsc("order")]
+                    COLLECTION_CHAPTERS_ID,
+                    [Query.equal("courseId", courseId), Query.orderAsc("order")]
                 );
-                return { ...chapter, topics: topicsData.documents };
-            }));
+                setChapters(chaptersData.documents);
 
-            setChapters(chaptersWithTopics);
+                // Fetch progress for chapters
+                const progressData = await databases.listDocuments(
+                    DATABASE_ID,
+                    COLLECTION_PROGRESS_ID,
+                    [Query.equal("userId", user.$id)]
+                );
+                const completedSet = new Set();
+                progressData.documents.forEach(p => {
+                    if (p.chapterId && p.status === "completed") {
+                        completedSet.add(p.chapterId);
+                    }
+                });
+                setCompletedChapters(completedSet);
 
-            // Set initial active topic
-            if (chaptersWithTopics.length > 0 && chaptersWithTopics[0].topics.length > 0) {
-                setActiveTopic(chaptersWithTopics[0].topics[0]);
+                // Fetch resources for all chapters
+                const resourcesMap = {};
+                for (const chapter of chaptersData.documents) {
+                    try {
+                        const resourcesData = await databases.listDocuments(
+                            DATABASE_ID,
+                            COLLECTION_RESOURCES_ID,
+                            [Query.equal("chapterId", chapter.$id)]
+                        );
+                        resourcesMap[chapter.$id] = resourcesData.documents;
+                    } catch (e) {
+                        resourcesMap[chapter.$id] = [];
+                    }
+                }
+                setChapterResources(resourcesMap);
+
+            } catch (error) {
+                console.error("Error fetching course data:", error);
+            } finally {
+                setLoading(false);
             }
+        };
+        fetchData();
+    }, [courseId, user]);
 
-            // Fetch progress
-            const progressData = await databases.listDocuments(
-                DATABASE_ID,
-                COLLECTION_PROGRESS_ID,
-                [Query.equal("userId", user.$id), Query.equal("status", "completed")]
-            );
-            const completedSet = new Set(progressData.documents.map(p => p.topicId));
-            setCompletedTopics(completedSet);
+    // Fetch image notes when chapter is expanded
+    useEffect(() => {
+        const fetchImageNotes = async () => {
+            if (!expandedChapter || !user) return;
+            if (chapterImageNotes[expandedChapter]) return; // Already fetched
+            
+            try {
+                const imageNotesData = await databases.listDocuments(
+                    DATABASE_ID,
+                    COLLECTION_IMAGE_NOTES_ID,
+                    [
+                        Query.equal("userId", user.$id),
+                        Query.equal("chapterId", expandedChapter),
+                        Query.orderDesc("$createdAt")
+                    ]
+                );
+                setChapterImageNotes(prev => ({
+                    ...prev,
+                    [expandedChapter]: imageNotesData.documents
+                }));
+            } catch (error) {
+                console.error("Error fetching image notes:", error);
+                setChapterImageNotes(prev => ({
+                    ...prev,
+                    [expandedChapter]: []
+                }));
+            }
+        };
+        fetchImageNotes();
+    }, [expandedChapter, user]);
 
-        } catch (error) {
-            console.error("Error fetching course data:", error);
-        } finally {
-            setLoading(false);
+    const handleChapterClick = (chapterId) => {
+        if (expandedChapter === chapterId) {
+            setExpandedChapter(null);
+        } else {
+            setExpandedChapter(chapterId);
+            setActiveTab("notes");
+            setNoteContent("");
         }
     };
 
-    const handleTopicClick = (topic) => {
-        setActiveTopic(topic);
-        setNoteContent(""); // Reset note for new topic (or fetch existing note if implemented)
-    };
-
-    // Fetch resources when active topic changes
-    useEffect(() => {
-        const fetchResources = async () => {
-            if (!activeTopic) return;
-            try {
-                const resourcesData = await databases.listDocuments(
-                    DATABASE_ID,
-                    COLLECTION_RESOURCES_ID,
-                    [Query.equal("topicId", activeTopic.$id)]
-                );
-                setResources(resourcesData.documents);
-            } catch (error) {
-                console.error("Error fetching resources:", error);
-                setResources([]);
-            }
-        };
-        fetchResources();
-    }, [activeTopic]);
-
-    const handleMarkComplete = async () => {
-        if (!activeTopic || markingComplete) return;
+    const handleMarkComplete = useCallback(async (chapterId) => {
+        if (!user || markingComplete === chapterId) return;
         
         // Check if already completed locally
-        if (completedTopics.has(activeTopic.$id)) return;
+        if (completedChapters.has(chapterId)) return;
         
-        setMarkingComplete(true);
+        setMarkingComplete(chapterId);
         try {
-            const user = await account.get();
-            
-            // Check if progress already exists in database to prevent duplicates
+            // Check if progress already exists
             const existingProgress = await databases.listDocuments(
                 DATABASE_ID,
                 COLLECTION_PROGRESS_ID,
                 [
                     Query.equal("userId", user.$id),
-                    Query.equal("topicId", activeTopic.$id),
+                    Query.equal("chapterId", chapterId),
                     Query.equal("status", "completed")
                 ]
             );
             
             if (existingProgress.documents.length > 0) {
-                // Already completed, just update local state
-                setCompletedTopics(prev => new Set(prev).add(activeTopic.$id));
-                toast.info("Topic already marked as complete");
+                setCompletedChapters(prev => new Set(prev).add(chapterId));
+                toast.info("Chapter already marked as complete");
                 return;
             }
             
@@ -175,26 +178,25 @@ export default function CoursePlayerPage({ params }) {
                 ID.unique(),
                 {
                     userId: user.$id,
-                    topicId: activeTopic.$id,
+                    chapterId: chapterId,
                     status: "completed",
                     completedAt: new Date().toISOString(),
                 }
             );
-            setCompletedTopics(prev => new Set(prev).add(activeTopic.$id));
-            toast.success("Topic marked as complete!");
+            setCompletedChapters(prev => new Set(prev).add(chapterId));
+            toast.success("Chapter marked as complete!");
         } catch (error) {
             console.error("Error marking complete:", error);
-            toast.error("Failed to mark topic as complete");
+            toast.error("Failed to mark chapter as complete");
         } finally {
-            setMarkingComplete(false);
+            setMarkingComplete(null);
         }
-    };
+    }, [user, completedChapters, toast, markingComplete]);
 
-    const handleSaveNote = async () => {
-        if (!noteContent.trim() || !activeTopic) return;
+    const handleSaveNote = useCallback(async () => {
+        if (!noteContent.trim() || !expandedChapter || !user) return;
         setSavingNote(true);
         try {
-            const user = await account.get();
             await databases.createDocument(
                 DATABASE_ID,
                 COLLECTION_NOTES_ID,
@@ -202,8 +204,7 @@ export default function CoursePlayerPage({ params }) {
                 {
                     userId: user.$id,
                     courseId: courseId,
-                    chapterId: activeTopic.chapterId,
-                    topicId: activeTopic.$id,
+                    chapterId: expandedChapter,
                     content: noteContent,
                 }
             );
@@ -215,212 +216,303 @@ export default function CoursePlayerPage({ params }) {
         } finally {
             setSavingNote(false);
         }
-    };
+    }, [noteContent, expandedChapter, user, courseId, toast]);
 
-    if (loading) return <div>Loading...</div>;
-    if (!course) return <div>Course not found</div>;
+    const handleImageNoteDelete = useCallback((deletedId) => {
+        if (!expandedChapter) return;
+        setChapterImageNotes(prev => ({
+            ...prev,
+            [expandedChapter]: (prev[expandedChapter] || []).filter(note => note.$id !== deletedId)
+        }));
+    }, [expandedChapter]);
+
+    const handleImageUploadComplete = useCallback(async () => {
+        if (!expandedChapter || !user) return;
+        try {
+            const imageNotesData = await databases.listDocuments(
+                DATABASE_ID,
+                COLLECTION_IMAGE_NOTES_ID,
+                [
+                    Query.equal("userId", user.$id),
+                    Query.equal("chapterId", expandedChapter),
+                    Query.orderDesc("$createdAt")
+                ]
+            );
+            setChapterImageNotes(prev => ({
+                ...prev,
+                [expandedChapter]: imageNotesData.documents
+            }));
+        } catch (error) {
+            console.error("Error refreshing image notes:", error);
+        }
+    }, [expandedChapter, user]);
+
+    // Calculate progress
+    const completedCount = chapters.filter(ch => completedChapters.has(ch.$id)).length;
+    const progressPercent = chapters.length > 0 ? Math.round((completedCount / chapters.length) * 100) : 0;
+
+    if (loading) return <CoursePlayerSkeleton />;
+    if (!course && !loading) return (
+        <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+            <div className="text-center">
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">Course not found</h2>
+                <p className="text-gray-500 mb-4">The course you're looking for doesn't exist or you don't have access to it.</p>
+                <Link href="/dashboard/courses" className="text-indigo-600 hover:text-indigo-700 font-medium">← Back to courses</Link>
+            </div>
+        </div>
+    );
+    if (!course) return <CoursePlayerSkeleton />;
 
     return (
-        <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-64px)] overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-200">
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col overflow-hidden order-1 lg:order-2">
-                {/* Header */}
-                <div className="h-16 border-b border-gray-200 flex items-center justify-between px-4 md:px-8 bg-white flex-shrink-0">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => handleNavigate('prev')}
-                            disabled={!getAdjacentTopic('prev')}
-                            className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                            title="Previous Topic"
-                        >
-                            <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <div className="overflow-hidden">
-                            <span className="text-sm text-gray-500 block truncate">Current Topic</span>
-                            <h2 className="text-lg font-bold text-gray-900 truncate">{activeTopic?.title}</h2>
-                        </div>
-                        <button
-                            onClick={() => handleNavigate('next')}
-                            disabled={!getAdjacentTopic('next')}
-                            className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                            title="Next Topic"
-                        >
-                            <ChevronRight className="w-5 h-5" />
-                        </button>
+        <div className="max-w-4xl mx-auto pb-20">
+            {/* Course Header */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div className="flex-1">
+                        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{course.title}</h1>
+                        {course.description && (
+                            <p className="text-gray-500 mt-2">{course.description}</p>
+                        )}
                     </div>
-                    <button
-                        onClick={handleMarkComplete}
-                        disabled={completedTopics.has(activeTopic?.$id) || markingComplete}
-                        className={`ml-4 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${completedTopics.has(activeTopic?.$id)
-                            ? "bg-green-100 text-green-700 cursor-default"
-                            : "bg-indigo-600 text-white hover:bg-indigo-700"
-                            }`}
+                    <Link
+                        href={`/dashboard/courses/create/${courseId}`}
+                        className="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors text-center"
                     >
-                        {completedTopics.has(activeTopic?.$id) ? "Completed" : "Mark Complete"}
-                    </button>
+                        Edit Course
+                    </Link>
                 </div>
+                
+                {/* Progress Bar */}
+                <div className="mt-6">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-gray-600">Progress</span>
+                        <span className="font-medium text-gray-900">{completedCount} of {chapters.length} chapters completed</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                            className="h-full bg-indigo-600 rounded-full transition-all duration-300"
+                            style={{ width: `${progressPercent}%` }}
+                        />
+                    </div>
+                </div>
+            </div>
 
-                {/* Scrollable Content Area */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-8">
-                    <div className="max-w-4xl mx-auto">
-                        {/* Video/Content Player */}
-                        <div className="aspect-video bg-black rounded-xl overflow-hidden mb-8 shadow-lg">
-                            {activeTopic?.type === 'video' || activeTopic?.type === 'youtube' ? (
-                                activeTopic.videoUrl ? (
-                                    <iframe
-                                        src={activeTopic.videoUrl.replace("watch?v=", "embed/")}
-                                        className="w-full h-full"
-                                        allowFullScreen
-                                        title={activeTopic.title}
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-white">No Video URL</div>
-                                )
-                            ) : (
-                                <div className="w-full h-full bg-white text-gray-900 p-8 overflow-y-auto">
-                                    <div className="prose prose-indigo max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-indigo-600 prose-strong:text-gray-900 prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-900 prose-pre:text-gray-100">
-                                        {activeTopic?.content ? (
-                                            <ReactMarkdown>{activeTopic.content}</ReactMarkdown>
+            {/* Chapters List */}
+            <div className="space-y-3">
+                {chapters.length === 0 ? (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+                        <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No chapters yet</h3>
+                        <p className="text-gray-500 mb-4">Add chapters to start tracking your progress.</p>
+                        <Link
+                            href={`/dashboard/courses/create/${courseId}`}
+                            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                        >
+                            Add Chapters
+                        </Link>
+                    </div>
+                ) : (
+                    chapters.map((chapter, index) => {
+                        const isExpanded = expandedChapter === chapter.$id;
+                        const isCompleted = completedChapters.has(chapter.$id);
+                        const resources = chapterResources[chapter.$id] || [];
+                        const imageNotes = chapterImageNotes[chapter.$id] || [];
+
+                        return (
+                            <div 
+                                key={chapter.$id} 
+                                className={`bg-white rounded-xl shadow-sm border transition-all ${isExpanded ? 'border-indigo-200 ring-1 ring-indigo-100' : 'border-gray-100'}`}
+                            >
+                                {/* Chapter Header */}
+                                <div 
+                                    onClick={() => handleChapterClick(chapter.$id)}
+                                    className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-t-xl"
+                                >
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMarkComplete(chapter.$id);
+                                        }}
+                                        disabled={isCompleted || markingComplete === chapter.$id}
+                                        className={`flex-shrink-0 transition-colors ${isCompleted ? 'text-green-500' : 'text-gray-300 hover:text-indigo-500'}`}
+                                        title={isCompleted ? "Completed" : "Mark as complete"}
+                                    >
+                                        {isCompleted ? (
+                                            <CheckCircle2 className="w-6 h-6" />
                                         ) : (
-                                            <p className="text-gray-500">No content available.</p>
+                                            <Circle className="w-6 h-6" />
+                                        )}
+                                    </button>
+                                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-indigo-100 text-indigo-600 font-semibold text-sm flex-shrink-0">
+                                        {index + 1}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className={`font-semibold truncate ${isCompleted ? 'text-gray-500' : 'text-gray-900'}`}>
+                                            {chapter.title}
+                                        </h3>
+                                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                                            {resources.length > 0 && (
+                                                <span className="flex items-center gap-1">
+                                                    <LinkIcon className="w-3 h-3" />
+                                                    {resources.length} resources
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex-shrink-0">
+                                        {isExpanded ? (
+                                            <ChevronDown className="w-5 h-5 text-gray-400" />
+                                        ) : (
+                                            <ChevronRight className="w-5 h-5 text-gray-400" />
                                         )}
                                     </div>
                                 </div>
-                            )}
-                        </div>
 
-                        {/* Navigation Buttons */}
-                        <div className="flex justify-between items-center mb-8">
-                            <button
-                                onClick={() => handleNavigate('prev')}
-                                disabled={!getAdjacentTopic('prev')}
-                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                                Previous
-                            </button>
-                            <button
-                                onClick={() => handleNavigate('next')}
-                                disabled={!getAdjacentTopic('next')}
-                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                            >
-                                Next
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                        </div>
+                                {/* Expanded Content */}
+                                {isExpanded && (
+                                    <div className="border-t border-gray-100 p-4">
+                                        {/* Tabs */}
+                                        <div className="mb-4 border-b border-gray-200">
+                                            <div className="flex gap-6">
+                                                <button
+                                                    onClick={() => setActiveTab("notes")}
+                                                    className={`pb-3 text-sm font-medium transition-colors relative ${activeTab === "notes" ? "text-indigo-600" : "text-gray-500 hover:text-gray-700"}`}
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <StickyNote className="w-4 h-4" />
+                                                        Notes
+                                                    </span>
+                                                    {activeTab === "notes" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
+                                                </button>
+                                                <button
+                                                    onClick={() => setActiveTab("images")}
+                                                    className={`pb-3 text-sm font-medium transition-colors relative flex items-center gap-2 ${activeTab === "images" ? "text-indigo-600" : "text-gray-500 hover:text-gray-700"}`}
+                                                >
+                                                    <ImageIcon className="w-4 h-4" />
+                                                    Images
+                                                    {imageNotes.length > 0 && (
+                                                        <span className="text-xs bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full">
+                                                            {imageNotes.length}
+                                                        </span>
+                                                    )}
+                                                    {activeTab === "images" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
+                                                </button>
+                                                <button
+                                                    onClick={() => setActiveTab("resources")}
+                                                    className={`pb-3 text-sm font-medium transition-colors relative flex items-center gap-2 ${activeTab === "resources" ? "text-indigo-600" : "text-gray-500 hover:text-gray-700"}`}
+                                                >
+                                                    <LinkIcon className="w-4 h-4" />
+                                                    Resources
+                                                    {resources.length > 0 && (
+                                                        <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                                            {resources.length}
+                                                        </span>
+                                                    )}
+                                                    {activeTab === "resources" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
+                                                </button>
+                                            </div>
+                                        </div>
 
-                        {/* Tabs */}
-                        <div className="mb-6 border-b border-gray-200">
-                            <div className="flex gap-8">
-                                <button
-                                    onClick={() => setActiveTab("notes")}
-                                    className={`pb-4 text-sm font-medium transition-colors relative ${activeTab === "notes" ? "text-indigo-600" : "text-gray-500 hover:text-gray-700"
-                                        }`}
-                                >
-                                    Notes
-                                    {activeTab === "notes" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab("resources")}
-                                    className={`pb-4 text-sm font-medium transition-colors relative ${activeTab === "resources" ? "text-indigo-600" : "text-gray-500 hover:text-gray-700"
-                                        }`}
-                                >
-                                    Resources
-                                    {activeTab === "resources" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600"></div>}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Tab Content */}
-                        {activeTab === "notes" && (
-                            <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                                <textarea
-                                    value={noteContent}
-                                    onChange={(e) => setNoteContent(e.target.value)}
-                                    placeholder="Take notes for this topic..."
-                                    className="w-full h-32 bg-white rounded-lg border border-gray-200 p-4 text-sm focus:border-indigo-500 focus:outline-none resize-none"
-                                />
-                                <div className="mt-4 flex justify-end">
-                                    <button
-                                        onClick={handleSaveNote}
-                                        disabled={savingNote}
-                                        className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                                    >
-                                        {savingNote ? "Saving..." : "Save Note"}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === "resources" && (
-                            <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                                {resources.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {resources.map((resource) => (
-                                            <a
-                                                key={resource.$id}
-                                                href={resource.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition-all group"
-                                            >
-                                                <div className="flex-shrink-0">
-                                                    {getResourceIcon(resource.type)}
+                                        {/* Tab Content */}
+                                        {activeTab === "notes" && (
+                                            <div className="bg-gray-50 rounded-xl p-4">
+                                                <textarea
+                                                    value={noteContent}
+                                                    onChange={(e) => setNoteContent(e.target.value)}
+                                                    placeholder="Take notes for this chapter..."
+                                                    className="w-full h-28 bg-white rounded-lg border border-gray-200 p-3 text-sm focus:border-indigo-500 focus:outline-none resize-none"
+                                                />
+                                                <div className="mt-3 flex justify-end">
+                                                    <button
+                                                        onClick={handleSaveNote}
+                                                        disabled={savingNote || !noteContent.trim()}
+                                                        className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                                                    >
+                                                        {savingNote ? "Saving..." : "Save Note"}
+                                                    </button>
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
-                                                        {resource.name}
-                                                    </h4>
-                                                    <p className="text-xs text-gray-500 capitalize">{resource.type}</p>
-                                                </div>
-                                                <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
-                                            </a>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center text-gray-500 text-sm py-8">
-                                        No resources attached to this topic.
+                                            </div>
+                                        )}
+
+                                        {activeTab === "images" && (
+                                            <div className="bg-gray-50 rounded-xl p-4">
+                                                <ImageNotesUploader
+                                                    courseId={courseId}
+                                                    chapterId={chapter.$id}
+                                                    onUploadComplete={handleImageUploadComplete}
+                                                />
+                                                
+                                                {imageNotes.length > 0 && (
+                                                    <div className="mt-4 pt-4 border-t border-gray-200">
+                                                        <h4 className="text-sm font-medium text-gray-700 mb-3">
+                                                            Saved Images ({imageNotes.length})
+                                                        </h4>
+                                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                                            {imageNotes.map((imageNote) => (
+                                                                <ImageNoteCard
+                                                                    key={imageNote.$id}
+                                                                    imageNote={imageNote}
+                                                                    onView={setViewingImageNote}
+                                                                    onDelete={handleImageNoteDelete}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {activeTab === "resources" && (
+                                            <div className="bg-gray-50 rounded-xl p-4">
+                                                {resources.length > 0 ? (
+                                                    <div className="space-y-2">
+                                                        {resources.map((resource) => (
+                                                            <a
+                                                                key={resource.$id}
+                                                                href={resource.url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition-all group"
+                                                            >
+                                                                <div className="flex-shrink-0">
+                                                                    {getResourceIcon(resource.type)}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <h4 className="font-medium text-gray-900 truncate group-hover:text-indigo-600 transition-colors text-sm">
+                                                                        {resource.name}
+                                                                    </h4>
+                                                                    <p className="text-xs text-gray-500 capitalize">{resource.type}</p>
+                                                                </div>
+                                                                <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors flex-shrink-0" />
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center text-gray-500 text-sm py-6">
+                                                        No resources attached to this chapter.
+                                                        <Link href={`/dashboard/courses/create/${courseId}`} className="block mt-2 text-indigo-600 hover:underline">
+                                                            Add resources
+                                                        </Link>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
-                        )}
-                    </div>
-                </div>
+                        );
+                    })
+                )}
             </div>
 
-            {/* Sidebar - Syllabus */}
-            <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-r border-gray-200 bg-gray-50 overflow-y-auto flex-shrink-0 order-2 lg:order-1 h-96 lg:h-auto">
-                <div className="p-4 border-b border-gray-200 sticky top-0 bg-gray-50 z-10">
-                    <h2 className="font-bold text-gray-900">Course Syllabus</h2>
-                </div>
-                <div className="p-4 space-y-6">
-                    {chapters.map((chapter) => (
-                        <div key={chapter.$id}>
-                            <h3 className="text-xs font-bold uppercase text-gray-500 mb-3">{chapter.title}</h3>
-                            <div className="space-y-1">
-                                {chapter.topics.map((topic) => {
-                                    const isActive = activeTopic?.$id === topic.$id;
-                                    const isCompleted = completedTopics.has(topic.$id);
-                                    return (
-                                        <button
-                                            key={topic.$id}
-                                            onClick={() => handleTopicClick(topic)}
-                                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${isActive ? "bg-indigo-100 text-indigo-700 font-medium" : "text-gray-600 hover:bg-gray-100"
-                                                }`}
-                                        >
-                                            <div className={`h-5 w-5 rounded-full flex items-center justify-center border ${isCompleted ? "bg-green-500 border-green-500 text-white" : "border-gray-300"
-                                                }`}>
-                                                {isCompleted && <span className="text-[10px]">✓</span>}
-                                            </div>
-                                            <span className="truncate text-left">{topic.title}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
+            {/* Image Note Viewer Modal */}
+            {viewingImageNote && (
+                <ImageNoteViewer
+                    imageNote={viewingImageNote}
+                    onClose={() => setViewingImageNote(null)}
+                    onDelete={handleImageNoteDelete}
+                />
+            )}
         </div>
     );
 }
