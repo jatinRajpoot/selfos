@@ -37,7 +37,9 @@ export async function GET(request) {
             createdAt: doc.createdAt,
             lastUsed: doc.lastUsed || null,
             // Show only last 4 characters as hint
-            keyHint: `sos_****${doc.keyHash.slice(-4)}`
+            keyHint: doc.keyLast4
+                ? `sos_****${doc.keyLast4}`
+                : `sos_****${doc.keyHash.slice(-4)}` // Fallback for old keys
         }));
 
         return NextResponse.json({ keys });
@@ -89,17 +91,41 @@ export async function POST(request) {
         const keyHash = hashApiKey(apiKey);
 
         // Store in database
-        const keyDoc = await databases.createDocument(
-            DATABASE_ID,
-            COLLECTION_API_KEYS_ID,
-            ID.unique(),
-            {
-                userId,
-                keyHash,
-                name: name.slice(0, 100),
-                createdAt: new Date().toISOString(),
+        // We try to include keyLast4, but if the schema hasn't been updated yet,
+        // we fallback to creating without it to avoid breaking the application.
+        let keyDoc;
+        try {
+            keyDoc = await databases.createDocument(
+                DATABASE_ID,
+                COLLECTION_API_KEYS_ID,
+                ID.unique(),
+                {
+                    userId,
+                    keyHash,
+                    keyLast4: apiKey.slice(-4),
+                    name: name.slice(0, 100),
+                    createdAt: new Date().toISOString(),
+                }
+            );
+        } catch (error) {
+            // If the error is due to unknown attribute (schema mismatch), try without keyLast4
+            if (error.code === 400 && error.message.includes("Attribute not found")) {
+                console.warn("Schema missing 'keyLast4' attribute. Creating key without it.");
+                keyDoc = await databases.createDocument(
+                    DATABASE_ID,
+                    COLLECTION_API_KEYS_ID,
+                    ID.unique(),
+                    {
+                        userId,
+                        keyHash,
+                        name: name.slice(0, 100),
+                        createdAt: new Date().toISOString(),
+                    }
+                );
+            } else {
+                throw error;
             }
-        );
+        }
 
         // Return the plain key ONLY ONCE - it cannot be retrieved again
         return NextResponse.json({
